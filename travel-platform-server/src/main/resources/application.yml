@@ -1,0 +1,41 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: travel-platform-server
+  datasource:
+    url: jdbc:mysql://localhost:3306/travel_platform?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:sql/schema.sql
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    com.travelplatform: info
+
+security:
+  jwt:
+    secret: travelplatform-demo-secret-key-for-jwt-signing-2026
+    expiration-seconds: 86400
+
+travel:
+  upload-dir: ./uploads

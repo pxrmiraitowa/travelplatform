@@ -1,0 +1,74 @@
+package com.travelplatform.vo.usercontact;
+
+public class UserContactVO {
+
+    private Long id;
+
+    private String name;
+
+    private String phone;
+
+    private String idCard;
+
+    private Integer contactType;
+
+    private Integer isDefault;
+
+    private String remark;
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public String getIdCard() {
+        return idCard;
+    }
+
+    public void setIdCard(String idCard) {
+        this.idCard = idCard;
+    }
+
+    public Integer getContactType() {
+        return contactType;
+    }
+
+    public void setContactType(Integer contactType) {
+        this.contactType = contactType;
+    }
+
+    public Integer getIsDefault() {
+        return isDefault;
+    }
+
+    public void setIsDefault(Integer isDefault) {
+        this.isDefault = isDefault;
+    }
+
+    public String getRemark() {
+        return remark;
+    }
+
+    public void setRemark(String remark) {
+        this.remark = remark;
+    }
+}
