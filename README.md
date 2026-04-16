@@ -52,6 +52,7 @@ travel-platform-server
 - 数据库账号：`root`
 - 数据库密码：`123456`
 - Swagger 地址：`http://localhost:8080/swagger-ui.html`
+❗记得到`travel-platform-server/src/main/resources/application.yml`中把账号和密码改成你自己的
 
 启动方式：
 
