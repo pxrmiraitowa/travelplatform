@@ -66,6 +66,13 @@ mvn spring-boot:run
 - 会自动建表并插入一批演示数据
 - 图片上传目录默认是后端目录下的 `uploads`
 
+#### 新编：如果jdk版本是24，后端的启动用下述方案
+```powershell
+cd travel-platform-server
+mvn package "-DskipTests"
+java -jar target\travel-platform-server-0.0.1-SNAPSHOT.jar
+```
+
 ### 3.3 前端启动
 
 前端目录：
