@@ -556,52 +556,209 @@ CREATE TABLE IF NOT EXISTS `price_alert` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 INSERT INTO `flight` (`flight_no`, `airline_name`, `departure_city`, `arrival_city`, `departure_airport`, `arrival_airport`, `departure_time`, `arrival_time`, `price`, `stock`, `cabin_class`, `baggage_policy`, `refund_policy`, `status`)
-SELECT 'FM8201', 'Shanghai Airlines', '涓婃捣', '鍖椾含', 'Hongqiao T1', 'Daxing', '2026-05-01 09:15:00', '2026-05-01 11:35:00', 799.00, 20, 'Economy', '20KG checked baggage', 'Change allowed before departure', 1
+SELECT 'FM8201', '上海航空', '上海', '北京', '虹桥T1', '大兴', '2026-05-01 09:15:00', '2026-05-01 11:35:00', 799.00, 20, '经济舱', '免费托运20KG', '起飞前可改期', 1
 WHERE NOT EXISTS (SELECT 1 FROM `flight` WHERE `flight_no` = 'FM8201' AND `departure_time` = '2026-05-01 09:15:00');
 
 INSERT INTO `flight` (`flight_no`, `airline_name`, `departure_city`, `arrival_city`, `departure_airport`, `arrival_airport`, `departure_time`, `arrival_time`, `price`, `stock`, `cabin_class`, `baggage_policy`, `refund_policy`, `status`)
-SELECT 'HO1257', 'Juneyao Airlines', '涓婃捣', '鍖椾含', 'Hongqiao T2', 'Capital T2', '2026-05-01 19:20:00', '2026-05-01 21:40:00', 869.00, 11, 'Economy', '20KG checked baggage', 'Change allowed before departure', 1
+SELECT 'HO1257', '吉祥航空', '上海', '北京', '虹桥T2', '首都T2', '2026-05-01 19:20:00', '2026-05-01 21:40:00', 869.00, 11, '经济舱', '免费托运20KG', '起飞前可改期', 1
 WHERE NOT EXISTS (SELECT 1 FROM `flight` WHERE `flight_no` = 'HO1257' AND `departure_time` = '2026-05-01 19:20:00');
 
 INSERT INTO `hotel` (`hotel_name`, `city`, `district`, `address`, `description`, `star_level`, `cover_image`, `check_in_time`, `check_out_time`, `status`)
-SELECT 'Shanghai Bund Select Hotel', '涓婃捣', '榛勬郸鍖?', 'No. 188 East Zhongshan Road', 'Demo comparable hotel near the Bund.', 5, '', '14:00', '12:00', 1
-WHERE NOT EXISTS (SELECT 1 FROM `hotel` WHERE `hotel_name` = 'Shanghai Bund Select Hotel');
+SELECT '上海外滩精选酒店', '上海', '黄浦区', '中山东一路188号', '用于价格对比演示的外滩商圈酒店样例。', 5, '', '14:00', '12:00', 1
+WHERE NOT EXISTS (SELECT 1 FROM `hotel` WHERE `hotel_name` = '上海外滩精选酒店');
 
 INSERT INTO `hotel` (`hotel_name`, `city`, `district`, `address`, `description`, `star_level`, `cover_image`, `check_in_time`, `check_out_time`, `status`)
-SELECT 'Shanghai Metro Garden Hotel', '涓婃捣', '闈欏畨鍖?', 'No. 66 Nanjing West Road', 'Demo comparable hotel for price comparison.', 5, '', '14:00', '12:00', 1
-WHERE NOT EXISTS (SELECT 1 FROM `hotel` WHERE `hotel_name` = 'Shanghai Metro Garden Hotel');
+SELECT '上海地铁花园酒店', '上海', '静安区', '南京西路66号', '用于价格对比演示的市中心酒店样例。', 5, '', '14:00', '12:00', 1
+WHERE NOT EXISTS (SELECT 1 FROM `hotel` WHERE `hotel_name` = '上海地铁花园酒店');
 
 INSERT INTO `hotel_room` (`hotel_id`, `room_name`, `bed_type`, `breakfast`, `room_area`, `guest_count`, `price`, `stock`, `cancel_rule`, `status`)
-SELECT h.id, 'Deluxe King Room', '1 King Bed', 'Double Breakfast', '35m2', 2, 618.00, 10, 'Free cancellation before 18:00 one day ahead', 1
+SELECT h.id, '豪华大床房', '1张特大床', '含双早', '35平方米', 2, 618.00, 10, '入住前一天18:00前可免费取消', 1
 FROM `hotel` h
-WHERE h.hotel_name = 'Shanghai Bund Select Hotel'
-  AND NOT EXISTS (SELECT 1 FROM `hotel_room` r WHERE r.hotel_id = h.id AND r.room_name = 'Deluxe King Room');
+WHERE h.hotel_name = '上海外滩精选酒店'
+  AND NOT EXISTS (SELECT 1 FROM `hotel_room` r WHERE r.hotel_id = h.id AND r.room_name = '豪华大床房');
 
 INSERT INTO `hotel_room` (`hotel_id`, `room_name`, `bed_type`, `breakfast`, `room_area`, `guest_count`, `price`, `stock`, `cancel_rule`, `status`)
-SELECT h.id, 'Business Twin Room', '2 Single Beds', 'Double Breakfast', '38m2', 2, 738.00, 8, 'Free cancellation before 18:00 one day ahead', 1
+SELECT h.id, '商务双床房', '2张单人床', '含双早', '38平方米', 2, 738.00, 8, '入住前一天18:00前可免费取消', 1
 FROM `hotel` h
-WHERE h.hotel_name = 'Shanghai Bund Select Hotel'
-  AND NOT EXISTS (SELECT 1 FROM `hotel_room` r WHERE r.hotel_id = h.id AND r.room_name = 'Business Twin Room');
+WHERE h.hotel_name = '上海外滩精选酒店'
+  AND NOT EXISTS (SELECT 1 FROM `hotel_room` r WHERE r.hotel_id = h.id AND r.room_name = '商务双床房');
 
 INSERT INTO `hotel_room` (`hotel_id`, `room_name`, `bed_type`, `breakfast`, `room_area`, `guest_count`, `price`, `stock`, `cancel_rule`, `status`)
-SELECT h.id, 'Select Queen Room', '1 Queen Bed', 'Breakfast Included', '30m2', 2, 558.00, 14, 'Free cancellation before 18:00 one day ahead', 1
+SELECT h.id, '精选大床房', '1张大床', '含早餐', '30平方米', 2, 558.00, 14, '入住前一天18:00前可免费取消', 1
 FROM `hotel` h
-WHERE h.hotel_name = 'Shanghai Metro Garden Hotel'
-  AND NOT EXISTS (SELECT 1 FROM `hotel_room` r WHERE r.hotel_id = h.id AND r.room_name = 'Select Queen Room');
+WHERE h.hotel_name = '上海地铁花园酒店'
+  AND NOT EXISTS (SELECT 1 FROM `hotel_room` r WHERE r.hotel_id = h.id AND r.room_name = '精选大床房');
 
 INSERT INTO `hotel_room` (`hotel_id`, `room_name`, `bed_type`, `breakfast`, `room_area`, `guest_count`, `price`, `stock`, `cancel_rule`, `status`)
-SELECT h.id, 'Executive Room', '1 King Bed', 'Double Breakfast', '42m2', 2, 699.00, 7, 'Free cancellation before 18:00 one day ahead', 1
+SELECT h.id, '行政大床房', '1张特大床', '含双早', '42平方米', 2, 699.00, 7, '入住前一天18:00前可免费取消', 1
 FROM `hotel` h
-WHERE h.hotel_name = 'Shanghai Metro Garden Hotel'
-  AND NOT EXISTS (SELECT 1 FROM `hotel_room` r WHERE r.hotel_id = h.id AND r.room_name = 'Executive Room');
+WHERE h.hotel_name = '上海地铁花园酒店'
+  AND NOT EXISTS (SELECT 1 FROM `hotel_room` r WHERE r.hotel_id = h.id AND r.room_name = '行政大床房');
 
 INSERT INTO `tour_package` (`package_name`, `destination`, `departure_city`, `days`, `price`, `stock`, `travel_dates`, `description`, `cover_image`, `status`)
-SELECT 'Sanya Free Travel 4D3N', '涓変簹', '娣卞湷', 4, 2899.00, 15, '2026-06-02,2026-06-09,2026-06-16', 'Demo free travel package for price compare.', '', 1
-WHERE NOT EXISTS (SELECT 1 FROM `tour_package` WHERE `package_name` = 'Sanya Free Travel 4D3N');
+SELECT '三亚自由行4天3晚', '三亚', '深圳', 4, 2899.00, 15, '2026-06-02,2026-06-09,2026-06-16', '用于价格对比演示的三亚自由行样例。', '', 1
+WHERE NOT EXISTS (SELECT 1 FROM `tour_package` WHERE `package_name` = '三亚自由行4天3晚');
 
 INSERT INTO `tour_package` (`package_name`, `destination`, `departure_city`, `days`, `price`, `stock`, `travel_dates`, `description`, `cover_image`, `status`)
-SELECT 'Sanya Resort 6D5N', '涓変簹', '鍖椾含', 6, 3899.00, 12, '2026-06-04,2026-06-11,2026-06-18', 'Demo resort package for price compare.', '', 1
-WHERE NOT EXISTS (SELECT 1 FROM `tour_package` WHERE `package_name` = 'Sanya Resort 6D5N');
+SELECT '三亚度假酒店6天5晚', '三亚', '北京', 6, 3899.00, 12, '2026-06-04,2026-06-11,2026-06-18', '用于价格对比演示的三亚度假样例。', '', 1
+WHERE NOT EXISTS (SELECT 1 FROM `tour_package` WHERE `package_name` = '三亚度假酒店6天5晚');
+
+-- Bulk demo inventory to keep each core product domain above 100 records.
+INSERT INTO `flight` (`flight_no`, `airline_name`, `departure_city`, `arrival_city`, `departure_airport`, `arrival_airport`, `departure_time`, `arrival_time`, `price`, `stock`, `cabin_class`, `baggage_policy`, `refund_policy`, `status`)
+WITH RECURSIVE seq AS (
+    SELECT 1 AS n
+    UNION ALL
+    SELECT n + 1 FROM seq WHERE n < 120
+)
+SELECT
+    CONCAT('TP', LPAD(n, 4, '0')) AS `flight_no`,
+    ELT(((n - 1) % 6) + 1, '中国国航', '东方航空', '南方航空', '海南航空', '春秋航空', '厦门航空') AS `airline_name`,
+    ELT(((n - 1) % 10) + 1, '上海', '北京', '广州', '深圳', '成都', '杭州', '南京', '武汉', '西安', '重庆') AS `departure_city`,
+    ELT((n % 10) + 1, '北京', '广州', '深圳', '成都', '杭州', '南京', '武汉', '西安', '重庆', '上海') AS `arrival_city`,
+    ELT(((n - 1) % 10) + 1, '上海虹桥T2', '北京首都T3', '广州白云T2', '深圳宝安T3', '成都天府T2', '杭州萧山T4', '南京禄口T1', '武汉天河T3', '西安咸阳T5', '重庆江北T3') AS `departure_airport`,
+    ELT((n % 10) + 1, '北京大兴', '广州白云T1', '深圳宝安T3', '成都双流T2', '杭州萧山T3', '南京禄口T2', '武汉天河T2', '西安咸阳T3', '重庆江北T2', '上海浦东T2') AS `arrival_airport`,
+    TIMESTAMPADD(HOUR, n * 6, '2026-07-01 06:00:00') AS `departure_time`,
+    TIMESTAMPADD(MINUTE, 110 + ((n - 1) % 9) * 20, TIMESTAMPADD(HOUR, n * 6, '2026-07-01 06:00:00')) AS `arrival_time`,
+    520 + ((n - 1) % 12) * 55 + ((n - 1) % 5) * 9.90 AS `price`,
+    18 + ((n - 1) % 40) AS `stock`,
+    ELT(((n - 1) % 3) + 1, '经济舱', '超级经济舱', '商务舱') AS `cabin_class`,
+    ELT(((n - 1) % 3) + 1, '免费托运20KG', '免费托运25KG', '免费托运30KG') AS `baggage_policy`,
+    ELT(((n - 1) % 3) + 1, '起飞前可免费改期一次', '起飞前退票收取手续费', '起飞前可改可退') AS `refund_policy`,
+    1 AS `status`
+FROM seq
+WHERE NOT EXISTS (
+    SELECT 1 FROM `flight` f WHERE f.`flight_no` = CONCAT('TP', LPAD(seq.n, 4, '0'))
+);
+
+INSERT INTO `train_ticket` (`train_no`, `train_type`, `departure_city`, `arrival_city`, `departure_station`, `arrival_station`, `departure_time`, `arrival_time`, `duration_minutes`, `business_price`, `first_class_price`, `second_class_price`, `business_stock`, `first_class_stock`, `second_class_stock`, `status`)
+WITH RECURSIVE seq AS (
+    SELECT 1 AS n
+    UNION ALL
+    SELECT n + 1 FROM seq WHERE n < 120
+)
+SELECT
+    CONCAT(ELT(((n - 1) % 4) + 1, 'G', 'D', 'C', 'Z'), LPAD(2000 + n, 4, '0')) AS `train_no`,
+    ELT(((n - 1) % 4) + 1, '高铁', '动车', '城际', '直达特快') AS `train_type`,
+    ELT(((n - 1) % 10) + 1, '上海', '北京', '广州', '深圳', '成都', '杭州', '南京', '武汉', '西安', '重庆') AS `departure_city`,
+    ELT((n % 10) + 1, '北京', '广州', '深圳', '成都', '杭州', '南京', '武汉', '西安', '重庆', '上海') AS `arrival_city`,
+    ELT(((n - 1) % 10) + 1, '上海虹桥', '北京南', '广州南', '深圳北', '成都东', '杭州东', '南京南', '武汉站', '西安北', '重庆西') AS `departure_station`,
+    ELT((n % 10) + 1, '北京丰台', '广州南', '深圳北', '成都东', '杭州东', '南京南', '武汉站', '西安北', '重庆北', '上海虹桥') AS `arrival_station`,
+    TIMESTAMPADD(HOUR, n * 4, '2026-07-01 07:00:00') AS `departure_time`,
+    TIMESTAMPADD(MINUTE, 55 + ((n - 1) % 8) * 35, TIMESTAMPADD(HOUR, n * 4, '2026-07-01 07:00:00')) AS `arrival_time`,
+    55 + ((n - 1) % 8) * 35 AS `duration_minutes`,
+    260 + ((n - 1) % 8) * 28 AS `business_price`,
+    160 + ((n - 1) % 8) * 18 AS `first_class_price`,
+    90 + ((n - 1) % 8) * 12 AS `second_class_price`,
+    8 + ((n - 1) % 20) AS `business_stock`,
+    18 + ((n - 1) % 30) AS `first_class_stock`,
+    40 + ((n - 1) % 80) AS `second_class_stock`,
+    1 AS `status`
+FROM seq
+WHERE NOT EXISTS (
+    SELECT 1 FROM `train_ticket` t WHERE t.`train_no` = CONCAT(ELT(((seq.n - 1) % 4) + 1, 'G', 'D', 'C', 'Z'), LPAD(2000 + seq.n, 4, '0'))
+);
+
+INSERT INTO `hotel` (`hotel_name`, `city`, `district`, `address`, `description`, `star_level`, `cover_image`, `check_in_time`, `check_out_time`, `status`)
+WITH RECURSIVE seq AS (
+    SELECT 1 AS n
+    UNION ALL
+    SELECT n + 1 FROM seq WHERE n < 120
+)
+SELECT
+    CONCAT(
+        ELT(((n - 1) % 10) + 1, '上海', '北京', '广州', '深圳', '成都', '杭州', '南京', '武汉', '西安', '重庆'),
+        '精选酒店',
+        LPAD(n, 3, '0')
+    ) AS `hotel_name`,
+    ELT(((n - 1) % 10) + 1, '上海', '北京', '广州', '深圳', '成都', '杭州', '南京', '武汉', '西安', '重庆') AS `city`,
+    ELT(((n - 1) % 5) + 1, '市中心', '商务区', '景区附近', '高铁站商圈', '江景休闲区') AS `district`,
+    CONCAT('演示大道', 100 + n, '号') AS `address`,
+    CONCAT('适合本地演示的中文酒店样例', LPAD(n, 3, '0'), '，可用于筛选、详情浏览和下单流程。') AS `description`,
+    3 + ((n - 1) % 3) AS `star_level`,
+    '' AS `cover_image`,
+    '14:00' AS `check_in_time`,
+    '12:00' AS `check_out_time`,
+    1 AS `status`
+FROM seq
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM `hotel` h
+    WHERE h.`hotel_name` = CONCAT(
+        ELT(((seq.n - 1) % 10) + 1, '上海', '北京', '广州', '深圳', '成都', '杭州', '南京', '武汉', '西安', '重庆'),
+        '精选酒店',
+        LPAD(seq.n, 3, '0')
+    )
+);
+
+INSERT INTO `hotel_room` (`hotel_id`, `room_name`, `bed_type`, `breakfast`, `room_area`, `guest_count`, `price`, `stock`, `cancel_rule`, `status`)
+SELECT
+    h.`id`,
+    room_seed.`room_name`,
+    room_seed.`bed_type`,
+    room_seed.`breakfast`,
+    room_seed.`room_area`,
+    room_seed.`guest_count`,
+    CASE room_seed.`room_name`
+        WHEN '舒适大床房' THEN 328.00 + MOD(CAST(RIGHT(h.`hotel_name`, 3) AS UNSIGNED), 12) * 17 + MOD(CAST(RIGHT(h.`hotel_name`, 3) AS UNSIGNED), 5) * 6
+        WHEN '高级双床房' THEN 418.00 + MOD(CAST(RIGHT(h.`hotel_name`, 3) AS UNSIGNED), 12) * 19 + MOD(CAST(RIGHT(h.`hotel_name`, 3) AS UNSIGNED), 4) * 8
+        WHEN '家庭套房' THEN 638.00 + MOD(CAST(RIGHT(h.`hotel_name`, 3) AS UNSIGNED), 12) * 23 + MOD(CAST(RIGHT(h.`hotel_name`, 3) AS UNSIGNED), 3) * 12
+        ELSE room_seed.`price`
+    END AS `price`,
+    CASE room_seed.`room_name`
+        WHEN '舒适大床房' THEN 10 + MOD(CAST(RIGHT(h.`hotel_name`, 3) AS UNSIGNED), 11)
+        WHEN '高级双床房' THEN 6 + MOD(CAST(RIGHT(h.`hotel_name`, 3) AS UNSIGNED), 9)
+        WHEN '家庭套房' THEN 4 + MOD(CAST(RIGHT(h.`hotel_name`, 3) AS UNSIGNED), 6)
+        ELSE room_seed.`stock`
+    END AS `stock`,
+    room_seed.`cancel_rule`,
+    1
+FROM `hotel` h
+JOIN (
+    SELECT '舒适大床房' AS `room_name`, '1张大床' AS `bed_type`, '含双早' AS `breakfast`, '28平方米' AS `room_area`, 2 AS `guest_count`, 368.00 AS `price`, 18 AS `stock`, '入住前一天18:00前可免费取消' AS `cancel_rule`
+    UNION ALL
+    SELECT '高级双床房', '2张单人床', '含双早', '32平方米', 2, 458.00, 12, '入住前一天18:00前可免费取消'
+    UNION ALL
+    SELECT '家庭套房', '1张大床+1张单人床', '含三早', '45平方米', 3, 688.00, 6, '入住前一天12:00前可免费取消'
+) room_seed
+WHERE h.`hotel_name` LIKE '%精选酒店%'
+  AND NOT EXISTS (
+      SELECT 1
+      FROM `hotel_room` r
+      WHERE r.`hotel_id` = h.`id`
+        AND r.`room_name` = room_seed.`room_name`
+  );
+
+INSERT INTO `tour_package` (`package_name`, `destination`, `departure_city`, `days`, `price`, `stock`, `travel_dates`, `description`, `cover_image`, `status`)
+WITH RECURSIVE seq AS (
+    SELECT 1 AS n
+    UNION ALL
+    SELECT n + 1 FROM seq WHERE n < 120
+)
+SELECT
+    CONCAT(
+        ELT(((n - 1) % 10) + 1, '三亚', '丽江', '张家界', '厦门', '青岛', '桂林', '哈尔滨', '苏州', '昆明', '大理'),
+        '精选线路',
+        LPAD(n, 3, '0')
+    ) AS `package_name`,
+    ELT(((n - 1) % 10) + 1, '三亚', '丽江', '张家界', '厦门', '青岛', '桂林', '哈尔滨', '苏州', '昆明', '大理') AS `destination`,
+    ELT((n % 10) + 1, '上海', '北京', '广州', '深圳', '成都', '杭州', '南京', '武汉', '西安', '重庆') AS `departure_city`,
+    3 + ((n - 1) % 5) AS `days`,
+    1880 + ((n - 1) % 10) * 220 + ((n - 1) % 3) * 59 AS `price`,
+    12 + ((n - 1) % 35) AS `stock`,
+    CONCAT('2026-08-', LPAD(((n - 1) % 28) + 1, 2, '0'), ',2026-09-', LPAD(((n + 6) % 28) + 1, 2, '0'), ',2026-10-', LPAD(((n + 13) % 28) + 1, 2, '0')) AS `travel_dates`,
+    CONCAT('中文旅游产品演示样例', LPAD(n, 3, '0'), '，适合用于线路浏览、详情展示与订单演示。') AS `description`,
+    '' AS `cover_image`,
+    1 AS `status`
+FROM seq
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM `tour_package` tp
+    WHERE tp.`package_name` = CONCAT(
+        ELT(((seq.n - 1) % 10) + 1, '三亚', '丽江', '张家界', '厦门', '青岛', '桂林', '哈尔滨', '苏州', '昆明', '大理'),
+        '精选线路',
+        LPAD(seq.n, 3, '0')
+    )
+);
 
 INSERT INTO `coupon` (`coupon_name`, `product_type`, `threshold_amount`, `discount_amount`, `discount_type`, `description`, `status`, `start_time`, `end_time`)
 SELECT 'Hotel Save 40', 'HOTEL', 500.00, 40.00, 'FULL_REDUCTION', 'Demo hotel coupon for detail page display.', 1, '2026-01-01 00:00:00', '2026-12-31 23:59:59'
@@ -630,7 +787,7 @@ WHERE NOT EXISTS (SELECT 1 FROM `coupon` WHERE `coupon_name` = 'Tour Instant 100
 INSERT INTO `price_alert` (`user_id`, `product_type`, `product_id`, `target_price`, `status`, `remark`)
 SELECT u.id, 'HOTEL', h.id, 650.00, 1, 'Demo hotel alert'
 FROM `user` u
-JOIN `hotel` h ON h.hotel_name = 'Shanghai Bund Select Hotel'
+JOIN `hotel` h ON h.hotel_name = '上海外滩精选酒店'
 WHERE u.username = 'demo_user'
   AND NOT EXISTS (
       SELECT 1 FROM `price_alert` pa
@@ -691,3 +848,4 @@ CREATE TABLE IF NOT EXISTS `review` (
     KEY `idx_review_user_id` (`user_id`),
     KEY `idx_review_biz` (`biz_type`, `biz_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+

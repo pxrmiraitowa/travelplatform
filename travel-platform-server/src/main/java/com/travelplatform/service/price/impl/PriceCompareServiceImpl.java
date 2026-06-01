@@ -59,7 +59,7 @@ public class PriceCompareServiceImpl implements PriceCompareService {
     public PriceCompareVO getHotelCompare(Long hotelId) {
         Hotel currentHotel = hotelMapper.selectById(hotelId);
         if (currentHotel == null || !Integer.valueOf(1).equals(currentHotel.getStatus())) {
-            throw new BusinessException(ResultCode.NOT_FOUND.getCode(), "Hotel not found");
+            throw new BusinessException(ResultCode.NOT_FOUND.getCode(), "酒店不存在");
         }
 
         List<Hotel> hotels = hotelMapper.selectList(new LambdaQueryWrapper<Hotel>()
@@ -80,7 +80,7 @@ public class PriceCompareServiceImpl implements PriceCompareService {
                         Collectors.mapping(HotelRoom::getPrice,
                                 Collectors.collectingAndThen(Collectors.minBy(BigDecimal::compareTo), item -> item.orElse(null)))));
 
-        List<CompareItemVO> compareItems = hotels.stream()
+        List<CompareItemVO> hotelCompareItems = hotels.stream()
                 .filter(hotel -> minPriceMap.get(hotel.getId()) != null)
                 .map(hotel -> {
                     CompareItemVO item = new CompareItemVO();
@@ -92,10 +92,11 @@ public class PriceCompareServiceImpl implements PriceCompareService {
                     return item;
                 })
                 .sorted(Comparator.comparing(CompareItemVO::getPrice).thenComparing(CompareItemVO::getProductId))
-                .limit(6)
                 .toList();
 
-        return buildCompareVO(PRODUCT_TYPE_HOTEL, hotelId, resolveCurrentPrice(compareItems, hotelId),
+        List<CompareItemVO> compareItems = keepCurrentHotelInCompareList(hotelCompareItems, hotelId);
+
+        return buildCompareVO(PRODUCT_TYPE_HOTEL, hotelId, resolveCurrentPrice(hotelCompareItems, hotelId),
                 compareItems, loadCoupons(PRODUCT_TYPE_HOTEL));
     }
 
@@ -103,7 +104,7 @@ public class PriceCompareServiceImpl implements PriceCompareService {
     public PriceCompareVO getFlightCompare(Long flightId) {
         Flight currentFlight = flightMapper.selectById(flightId);
         if (currentFlight == null || !Integer.valueOf(1).equals(currentFlight.getStatus())) {
-            throw new BusinessException(ResultCode.NOT_FOUND.getCode(), "Flight not found");
+            throw new BusinessException(ResultCode.NOT_FOUND.getCode(), "航班不存在");
         }
 
         LocalDate departureDate = currentFlight.getDepartureTime().toLocalDate();
@@ -137,7 +138,7 @@ public class PriceCompareServiceImpl implements PriceCompareService {
     public PriceCompareVO getTourCompare(Long tourId) {
         TourPackage currentTour = tourPackageMapper.selectById(tourId);
         if (currentTour == null || !Integer.valueOf(1).equals(currentTour.getStatus())) {
-            throw new BusinessException(ResultCode.NOT_FOUND.getCode(), "Tour not found");
+            throw new BusinessException(ResultCode.NOT_FOUND.getCode(), "旅游产品不存在");
         }
 
         List<TourPackage> tours = tourPackageMapper.selectList(new LambdaQueryWrapper<TourPackage>()
@@ -172,14 +173,14 @@ public class PriceCompareServiceImpl implements PriceCompareService {
             case PRODUCT_TYPE_HOTEL -> buildHotelSnapshot(productId);
             case PRODUCT_TYPE_FLIGHT -> buildFlightSnapshot(productId);
             case PRODUCT_TYPE_TOUR -> buildTourSnapshot(productId);
-            default -> throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "Unsupported product type");
+            default -> throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "不支持的产品类型");
         };
     }
 
     private ProductSnapshot buildHotelSnapshot(Long hotelId) {
         Hotel hotel = hotelMapper.selectById(hotelId);
         if (hotel == null || !Integer.valueOf(1).equals(hotel.getStatus())) {
-            throw new BusinessException(ResultCode.NOT_FOUND.getCode(), "Hotel not found");
+            throw new BusinessException(ResultCode.NOT_FOUND.getCode(), "酒店不存在");
         }
         BigDecimal currentPrice = hotelRoomMapper.selectList(new LambdaQueryWrapper<HotelRoom>()
                         .eq(HotelRoom::getHotelId, hotelId)
@@ -188,14 +189,14 @@ public class PriceCompareServiceImpl implements PriceCompareService {
                 .stream()
                 .map(HotelRoom::getPrice)
                 .min(BigDecimal::compareTo)
-                .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST.getCode(), "Hotel has no available room"));
+                .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST.getCode(), "当前酒店暂无可售房型"));
         return new ProductSnapshot(PRODUCT_TYPE_HOTEL, hotelId, hotel.getHotelName(), currentPrice);
     }
 
     private ProductSnapshot buildFlightSnapshot(Long flightId) {
         Flight flight = flightMapper.selectById(flightId);
         if (flight == null || !Integer.valueOf(1).equals(flight.getStatus())) {
-            throw new BusinessException(ResultCode.NOT_FOUND.getCode(), "Flight not found");
+            throw new BusinessException(ResultCode.NOT_FOUND.getCode(), "航班不存在");
         }
         return new ProductSnapshot(PRODUCT_TYPE_FLIGHT, flightId, flight.getFlightNo(), flight.getPrice());
     }
@@ -203,18 +204,18 @@ public class PriceCompareServiceImpl implements PriceCompareService {
     private ProductSnapshot buildTourSnapshot(Long tourId) {
         TourPackage tour = tourPackageMapper.selectById(tourId);
         if (tour == null || !Integer.valueOf(1).equals(tour.getStatus())) {
-            throw new BusinessException(ResultCode.NOT_FOUND.getCode(), "Tour not found");
+            throw new BusinessException(ResultCode.NOT_FOUND.getCode(), "旅游产品不存在");
         }
         return new ProductSnapshot(PRODUCT_TYPE_TOUR, tourId, tour.getPackageName(), tour.getPrice());
     }
 
     public String normalizeProductType(String productType) {
         if (!StringUtils.hasText(productType)) {
-            throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "Product type is required");
+            throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "产品类型不能为空");
         }
         String value = productType.trim().toUpperCase();
         if (!PRODUCT_TYPE_HOTEL.equals(value) && !PRODUCT_TYPE_FLIGHT.equals(value) && !PRODUCT_TYPE_TOUR.equals(value)) {
-            throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "Unsupported product type");
+            throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "不支持的产品类型");
         }
         return value;
     }
@@ -226,7 +227,7 @@ public class PriceCompareServiceImpl implements PriceCompareService {
                                           List<CouponVO> couponList) {
         List<CompareItemVO> mutableItems = new ArrayList<>(compareItems);
         if (mutableItems.isEmpty()) {
-            throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "No comparable products found");
+            throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "当前产品暂无可比价样例");
         }
 
         BigDecimal lowestPrice = mutableItems.stream()
@@ -282,12 +283,36 @@ public class PriceCompareServiceImpl implements PriceCompareService {
         return vo;
     }
 
+    // Hotel compare cards should always include the current hotel, otherwise
+    // a mid-priced hotel can be filtered out by the top-6 cap and trigger a false error.
+    private List<CompareItemVO> keepCurrentHotelInCompareList(List<CompareItemVO> compareItems, Long hotelId) {
+        if (compareItems.size() <= 6) {
+            return compareItems;
+        }
+
+        CompareItemVO currentItem = compareItems.stream()
+                .filter(item -> hotelId.equals(item.getProductId()))
+                .findFirst()
+                .orElse(null);
+        if (currentItem == null) {
+            return compareItems.stream().limit(6).toList();
+        }
+
+        List<CompareItemVO> limitedItems = compareItems.stream()
+                .filter(item -> !hotelId.equals(item.getProductId()))
+                .limit(5)
+                .collect(Collectors.toCollection(ArrayList::new));
+        limitedItems.add(currentItem);
+        limitedItems.sort(Comparator.comparing(CompareItemVO::getPrice).thenComparing(CompareItemVO::getProductId));
+        return limitedItems;
+    }
+
     private BigDecimal resolveCurrentPrice(List<CompareItemVO> compareItems, Long productId) {
         return compareItems.stream()
                 .filter(item -> productId.equals(item.getProductId()))
                 .map(CompareItemVO::getPrice)
                 .findFirst()
-                .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST.getCode(), "Current product has no comparable price"));
+                .orElseThrow(() -> new BusinessException(ResultCode.BAD_REQUEST.getCode(), "当前酒店暂无可比价房型"));
     }
 
     private String buildHotelSubtitle(Hotel hotel) {
