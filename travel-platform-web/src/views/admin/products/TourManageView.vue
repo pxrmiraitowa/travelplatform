@@ -16,7 +16,7 @@
 
 <script setup>
 import AdminCrudPage from '@/components/admin/AdminCrudPage.vue'
-import { createAdminTour, deleteAdminTour, getAdminTours, updateAdminTour } from '@/api/admin'
+import { createAdminTour, deleteAdminTour, getAdminTours, updateAdminTour, uploadAdminProductImage } from '@/api/admin'
 
 const statusOptions = [{ label: '启用', value: 1 }, { label: '停用', value: 0 }]
 const statusTagMap = { 1: { label: '启用', type: 'success' }, 0: { label: '停用', type: 'info' } }
@@ -45,7 +45,8 @@ const formFields = [
   { label: '库存', prop: 'stock', type: 'number', min: 0, required: true },
   { label: '出行日期', prop: 'travelDates', placeholder: '多个日期用逗号分隔' },
   { label: '产品描述', prop: 'description', type: 'textarea' },
-  { label: '封面图', prop: 'coverImage' },
+  { label: '封面图', prop: 'coverImage', type: 'image-upload', uploadApi: uploadAdminProductImage },
+  { label: '详情图集', prop: 'detailImages', type: 'multi-image-upload', uploadApi: uploadAdminProductImage, max: 9 },
   { label: '状态', prop: 'status', type: 'select', options: statusOptions, required: true }
 ]
 
@@ -60,6 +61,7 @@ const initialForm = {
   travelDates: '',
   description: '',
   coverImage: '',
+  detailImages: '',
   status: 1
 }
 </script>

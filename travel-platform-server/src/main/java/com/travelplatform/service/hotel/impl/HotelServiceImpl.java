@@ -3,6 +3,7 @@ package com.travelplatform.service.hotel.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.travelplatform.common.exception.BusinessException;
 import com.travelplatform.common.result.ResultCode;
+import com.travelplatform.common.util.ProductMediaUtils;
 import com.travelplatform.dto.hotel.HotelQueryRequest;
 import com.travelplatform.entity.Hotel;
 import com.travelplatform.entity.HotelRoom;
@@ -101,6 +102,7 @@ public class HotelServiceImpl implements HotelService {
         vo.setDescription(hotel.getDescription());
         vo.setStarLevel(hotel.getStarLevel());
         vo.setCoverImage(hotel.getCoverImage());
+        vo.setDetailImages(ProductMediaUtils.parseImageList(hotel.getDetailImages(), hotel.getCoverImage()));
         vo.setCheckInTime(hotel.getCheckInTime());
         vo.setCheckOutTime(hotel.getCheckOutTime());
         vo.setMinPrice(resolveMinPrice(rooms));

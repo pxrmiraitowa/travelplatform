@@ -1,6 +1,7 @@
 package com.travelplatform.vo.hotel;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 public class HotelListItemVO {
 
@@ -12,6 +13,7 @@ public class HotelListItemVO {
     private String description;
     private Integer starLevel;
     private String coverImage;
+    private List<String> detailImages;
     private String checkInTime;
     private String checkOutTime;
     private BigDecimal minPrice;
@@ -79,6 +81,14 @@ public class HotelListItemVO {
 
     public void setCoverImage(String coverImage) {
         this.coverImage = coverImage;
+    }
+
+    public List<String> getDetailImages() {
+        return detailImages;
+    }
+
+    public void setDetailImages(List<String> detailImages) {
+        this.detailImages = detailImages;
     }
 
     public String getCheckInTime() {

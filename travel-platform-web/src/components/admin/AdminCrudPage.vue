@@ -57,8 +57,17 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="操作" width="260" fixed="right">
           <template #default="{ row }">
+            <el-button
+              v-for="action in rowActions"
+              :key="action.key"
+              link
+              :type="action.type || 'primary'"
+              @click="action.onClick(row)"
+            >
+              {{ action.label }}
+            </el-button>
             <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
             <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
@@ -127,6 +136,37 @@
             format="YYYY-MM-DD HH:mm:ss"
             class="admin-number"
           />
+          <div v-else-if="field.type === 'image-upload'" class="upload-field">
+            <el-upload
+              :class="{ 'is-upload-hidden': shouldHideUpload(field) }"
+              :http-request="(option) => handleImageUpload(field, option, false)"
+              :file-list="buildSingleImageFileList(field.prop)"
+              list-type="picture-card"
+              :limit="1"
+              :on-preview="handlePreview"
+              :on-remove="() => removeSingleImage(field.prop)"
+              accept="image/*"
+            >
+              <el-icon v-if="!formData[field.prop]"><Plus /></el-icon>
+            </el-upload>
+            <div class="upload-tip">{{ field.placeholder || '上传一张封面图' }}</div>
+          </div>
+          <div v-else-if="field.type === 'multi-image-upload'" class="upload-field">
+            <el-upload
+              :class="{ 'is-upload-hidden': shouldHideUpload(field) }"
+              :http-request="(option) => handleImageUpload(field, option, true)"
+              :file-list="buildMultiImageFileList(field.prop)"
+              list-type="picture-card"
+              :limit="field.max || 9"
+              :on-preview="handlePreview"
+              :on-remove="(file) => removeMultiImage(field.prop, file)"
+              accept="image/*"
+              multiple
+            >
+              <el-icon v-if="buildMultiImageFileList(field.prop).length < (field.max || 9)"><Plus /></el-icon>
+            </el-upload>
+            <div class="upload-tip">{{ field.placeholder || '上传多张详情图' }}</div>
+          </div>
         </el-form-item>
       </el-form>
 
@@ -135,18 +175,24 @@
         <el-button type="primary" :loading="submitLoading" @click="handleSubmit">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="previewVisible" width="720px" append-to-body>
+      <img v-if="previewUrl" :src="previewUrl" class="preview-image" alt="preview" />
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
 
 const props = defineProps({
   title: { type: String, required: true },
   description: { type: String, default: '' },
   filters: { type: Array, default: () => [] },
   columns: { type: Array, default: () => [] },
+  rowActions: { type: Array, default: () => [] },
   formFields: { type: Array, default: () => [] },
   initialQuery: { type: Object, default: () => ({}) },
   initialForm: { type: Object, default: () => ({}) },
@@ -163,6 +209,8 @@ const editingId = ref(null)
 const tableData = ref([])
 const total = ref(0)
 const formRef = ref()
+const previewVisible = ref(false)
+const previewUrl = ref('')
 
 const queryForm = reactive({
   pageNum: 1,
@@ -183,6 +231,38 @@ const dialogTitle = computed(() => editingId.value ? `编辑${props.title}` : `�
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value))
+}
+
+function splitImageUrls(value) {
+  if (!value) {
+    return []
+  }
+  return String(value)
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function buildSingleImageFileList(prop) {
+  const url = formData[prop]
+  return url ? [{ name: 'image', url }] : []
+}
+
+function buildMultiImageFileList(prop) {
+  return splitImageUrls(formData[prop]).map((url, index) => ({
+    name: `image-${index + 1}`,
+    url
+  }))
+}
+
+function shouldHideUpload(field) {
+  if (field.type === 'image-upload') {
+    return Boolean(formData[field.prop])
+  }
+  if (field.type === 'multi-image-upload') {
+    return buildMultiImageFileList(field.prop).length >= (field.max || 9)
+  }
+  return false
 }
 
 function resetFormData(data = props.initialForm) {
@@ -216,6 +296,43 @@ function openEdit(row) {
   editingId.value = row.id
   resetFormData(row)
   dialogVisible.value = true
+}
+
+async function handleImageUpload(field, option, multiple) {
+  try {
+    const response = await field.uploadApi(option.file)
+    const uploadedUrl = response.data.url
+    if (multiple) {
+      const imageUrls = splitImageUrls(formData[field.prop])
+      if (!imageUrls.includes(uploadedUrl)) {
+        imageUrls.push(uploadedUrl)
+      }
+      formData[field.prop] = imageUrls.join('\n')
+    } else {
+      formData[field.prop] = uploadedUrl
+    }
+    option.onSuccess(response)
+  } catch (error) {
+    option.onError(error)
+  }
+}
+
+function removeSingleImage(prop) {
+  formData[prop] = ''
+}
+
+function removeMultiImage(prop, file) {
+  formData[prop] = splitImageUrls(formData[prop])
+    .filter((url) => url !== file.url)
+    .join('\n')
+}
+
+function handlePreview(file) {
+  if (!file?.url) {
+    return
+  }
+  previewUrl.value = file.url
+  previewVisible.value = true
 }
 
 async function handleDelete(row) {
@@ -258,3 +375,26 @@ defineExpose({ loadData })
 
 loadData()
 </script>
+
+<style scoped>
+.upload-field {
+  width: 100%;
+}
+
+.upload-tip {
+  margin-top: 8px;
+  color: #7a869a;
+  font-size: 12px;
+}
+
+.is-upload-hidden :deep(.el-upload--picture-card) {
+  display: none;
+}
+
+.preview-image {
+  display: block;
+  width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+}
+</style>

@@ -2,6 +2,10 @@
   <div class="detail-page" v-loading="loading">
     <SectionCard title="旅游产品详情" description="查看产品信息、可选出行日期，以及同类产品价格对比和优惠提醒。">
       <div v-if="tour" class="detail-grid">
+        <div v-if="heroImage" class="hero-image">
+          <el-image :src="heroImage" fit="cover" :preview-src-list="galleryImages.length ? galleryImages : [heroImage]" preview-teleported />
+        </div>
+
         <div class="hero-row">
           <div>
             <div class="title-line">{{ tour.packageName }}</div>
@@ -15,6 +19,12 @@
         </div>
 
         <div class="desc-box">{{ tour.description }}</div>
+
+        <div v-if="galleryImages.length > 1" class="gallery-grid">
+          <div v-for="image in galleryImages" :key="image" class="gallery-card">
+            <el-image :src="image" fit="cover" :preview-src-list="galleryImages" preview-teleported />
+          </div>
+        </div>
 
         <div class="date-panel">
           <h4>可选出行日期</h4>
@@ -47,7 +57,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import SectionCard from '@/components/SectionCard.vue'
@@ -67,6 +77,8 @@ const selectedDate = ref('')
 const compareData = ref(null)
 const alertDialogVisible = ref(false)
 const defaultTargetPrice = ref(0)
+const galleryImages = computed(() => tour.value?.detailImages || [])
+const heroImage = computed(() => tour.value?.coverImage || galleryImages.value[0] || '')
 
 async function loadTourDetail() {
   loading.value = true
@@ -123,6 +135,25 @@ onMounted(() => {
   gap: 20px;
 }
 
+.hero-image {
+  width: 100%;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #e2e8f0;
+}
+
+.hero-image :deep(.el-image) {
+  display: block;
+  width: 100%;
+}
+
+.hero-image :deep(img) {
+  display: block;
+  width: 100%;
+  height: 360px;
+  object-fit: cover;
+}
+
 .hero-row {
   display: flex;
   justify-content: space-between;
@@ -157,6 +188,30 @@ onMounted(() => {
   background: #f8fafc;
 }
 
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.gallery-card {
+  border-radius: 16px;
+  overflow: hidden;
+  background: #e2e8f0;
+}
+
+.gallery-card :deep(.el-image) {
+  display: block;
+  width: 100%;
+}
+
+.gallery-card :deep(img) {
+  display: block;
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+}
+
 .date-tags {
   display: flex;
   gap: 8px;
@@ -171,5 +226,11 @@ onMounted(() => {
   margin-top: 12px;
   color: #7a869a;
   font-size: 13px;
+}
+
+@media (max-width: 768px) {
+  .hero-image :deep(img) {
+    height: 240px;
+  }
 }
 </style>

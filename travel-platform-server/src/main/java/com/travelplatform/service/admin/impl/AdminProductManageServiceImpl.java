@@ -3,6 +3,7 @@ package com.travelplatform.service.admin.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.travelplatform.common.exception.BusinessException;
 import com.travelplatform.common.result.ResultCode;
+import com.travelplatform.common.util.ProductMediaUtils;
 import com.travelplatform.dto.admin.product.AdminFlightSaveRequest;
 import com.travelplatform.dto.admin.product.AdminHotelRoomSaveRequest;
 import com.travelplatform.dto.admin.product.AdminHotelSaveRequest;
@@ -279,6 +280,7 @@ public class AdminProductManageServiceImpl implements AdminProductManageService 
         hotel.setDescription(request.getDescription());
         hotel.setStarLevel(request.getStarLevel());
         hotel.setCoverImage(request.getCoverImage());
+        hotel.setDetailImages(ProductMediaUtils.normalizeImageList(request.getDetailImages()));
         hotel.setCheckInTime(request.getCheckInTime());
         hotel.setCheckOutTime(request.getCheckOutTime());
         hotel.setStatus(request.getStatus());
@@ -307,6 +309,7 @@ public class AdminProductManageServiceImpl implements AdminProductManageService 
         tour.setTravelDates(request.getTravelDates());
         tour.setDescription(request.getDescription());
         tour.setCoverImage(request.getCoverImage());
+        tour.setDetailImages(ProductMediaUtils.normalizeImageList(request.getDetailImages()));
         tour.setStatus(request.getStatus());
     }
 
@@ -436,6 +439,7 @@ public class AdminProductManageServiceImpl implements AdminProductManageService 
         vo.setDescription(hotel.getDescription());
         vo.setStarLevel(hotel.getStarLevel());
         vo.setCoverImage(hotel.getCoverImage());
+        vo.setDetailImages(hotel.getDetailImages());
         vo.setCheckInTime(hotel.getCheckInTime());
         vo.setCheckOutTime(hotel.getCheckOutTime());
         vo.setStatus(hotel.getStatus());
@@ -474,6 +478,7 @@ public class AdminProductManageServiceImpl implements AdminProductManageService 
         vo.setTravelDates(tour.getTravelDates());
         vo.setDescription(tour.getDescription());
         vo.setCoverImage(tour.getCoverImage());
+        vo.setDetailImages(tour.getDetailImages());
         vo.setStatus(tour.getStatus());
         vo.setCreateTime(tour.getCreateTime());
         return vo;

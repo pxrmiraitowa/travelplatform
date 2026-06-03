@@ -14,6 +14,7 @@ public class TourListItemVO {
     private Integer stock;
     private String description;
     private String coverImage;
+    private List<String> detailImages;
     private List<String> travelDateOptions;
 
     public Long getId() {
@@ -86,6 +87,14 @@ public class TourListItemVO {
 
     public void setCoverImage(String coverImage) {
         this.coverImage = coverImage;
+    }
+
+    public List<String> getDetailImages() {
+        return detailImages;
+    }
+
+    public void setDetailImages(List<String> detailImages) {
+        this.detailImages = detailImages;
     }
 
     public List<String> getTravelDateOptions() {

@@ -125,6 +125,19 @@ export function deleteAdminTour(id) {
   return request({ url: `/admin/tours/${id}`, method: 'delete' })
 }
 
+export function uploadAdminProductImage(file) {
+  const formData = new FormData()
+  formData.append('file', file)
+  return request({
+    url: '/admin/media/upload',
+    method: 'post',
+    data: formData,
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+}
+
 export function getAdminOrders(params) {
   return request({ url: '/admin/orders', method: 'get', params })
 }

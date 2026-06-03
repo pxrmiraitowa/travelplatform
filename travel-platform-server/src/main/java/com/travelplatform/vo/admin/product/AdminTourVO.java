@@ -15,6 +15,7 @@ public class AdminTourVO {
     private String travelDates;
     private String description;
     private String coverImage;
+    private String detailImages;
     private Integer status;
     private LocalDateTime createTime;
 
@@ -38,6 +39,8 @@ public class AdminTourVO {
     public void setDescription(String description) { this.description = description; }
     public String getCoverImage() { return coverImage; }
     public void setCoverImage(String coverImage) { this.coverImage = coverImage; }
+    public String getDetailImages() { return detailImages; }
+    public void setDetailImages(String detailImages) { this.detailImages = detailImages; }
     public Integer getStatus() { return status; }
     public void setStatus(Integer status) { this.status = status; }
     public LocalDateTime getCreateTime() { return createTime; }
