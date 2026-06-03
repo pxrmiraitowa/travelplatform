@@ -20,6 +20,7 @@ public class TourPackage extends BaseEntity {
     private String travelDates;
     private String description;
     private String coverImage;
+    private String detailImages;
     private Integer status;
 
     public Long getId() {
@@ -100,6 +101,14 @@ public class TourPackage extends BaseEntity {
 
     public void setCoverImage(String coverImage) {
         this.coverImage = coverImage;
+    }
+
+    public String getDetailImages() {
+        return detailImages;
+    }
+
+    public void setDetailImages(String detailImages) {
+        this.detailImages = detailImages;
     }
 
     public Integer getStatus() {

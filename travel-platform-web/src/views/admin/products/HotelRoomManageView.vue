@@ -15,9 +15,11 @@
 </template>
 
 <script setup>
+import { useRoute } from 'vue-router'
 import AdminCrudPage from '@/components/admin/AdminCrudPage.vue'
 import { createAdminHotelRoom, deleteAdminHotelRoom, getAdminHotelRooms, updateAdminHotelRoom } from '@/api/admin'
 
+const route = useRoute()
 const statusOptions = [{ label: '启用', value: 1 }, { label: '停用', value: 0 }]
 const statusTagMap = { 1: { label: '启用', type: 'success' }, 0: { label: '停用', type: 'info' } }
 
@@ -28,6 +30,7 @@ const filters = [
 ]
 
 const columns = [
+  { label: '酒店ID', prop: 'hotelId', width: 90 },
   { label: '房型名称', prop: 'roomName', minWidth: 160 },
   { label: '酒店', prop: 'hotelName', minWidth: 180 },
   { label: '床型', prop: 'bedType', width: 120 },
@@ -50,9 +53,15 @@ const formFields = [
   { label: '状态', prop: 'status', type: 'select', options: statusOptions, required: true }
 ]
 
-const initialQuery = { hotelId: '', keyword: '', status: undefined }
+const initialHotelId = Number(route.query.hotelId)
+const initialQuery = {
+  hotelId: Number.isFinite(initialHotelId) && initialHotelId > 0 ? initialHotelId : '',
+  keyword: '',
+  status: undefined
+}
+
 const initialForm = {
-  hotelId: 1,
+  hotelId: Number.isFinite(initialHotelId) && initialHotelId > 0 ? initialHotelId : undefined,
   roomName: '',
   bedType: '',
   breakfast: '',

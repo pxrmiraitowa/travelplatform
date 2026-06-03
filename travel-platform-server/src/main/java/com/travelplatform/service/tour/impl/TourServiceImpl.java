@@ -3,6 +3,7 @@ package com.travelplatform.service.tour.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.travelplatform.common.exception.BusinessException;
 import com.travelplatform.common.result.ResultCode;
+import com.travelplatform.common.util.ProductMediaUtils;
 import com.travelplatform.entity.TourPackage;
 import com.travelplatform.mapper.TourPackageMapper;
 import com.travelplatform.service.tour.TourService;
@@ -77,6 +78,7 @@ public class TourServiceImpl implements TourService {
         vo.setStock(tourPackage.getStock());
         vo.setDescription(tourPackage.getDescription());
         vo.setCoverImage(tourPackage.getCoverImage());
+        vo.setDetailImages(ProductMediaUtils.parseImageList(tourPackage.getDetailImages(), tourPackage.getCoverImage()));
         vo.setTravelDateOptions(parseTravelDates(tourPackage.getTravelDates()));
     }
 

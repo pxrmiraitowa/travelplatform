@@ -253,6 +253,22 @@ CREATE TABLE IF NOT EXISTS `hotel` (
     KEY `idx_hotel_city_status` (`city`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+SET @hotel_detail_images_exists = (
+    SELECT COUNT(*)
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'hotel'
+      AND COLUMN_NAME = 'detail_images'
+);
+SET @hotel_detail_images_sql = IF(
+    @hotel_detail_images_exists = 0,
+    'ALTER TABLE `hotel` ADD COLUMN `detail_images` TEXT DEFAULT NULL AFTER `cover_image`',
+    'SELECT 1'
+);
+PREPARE hotel_detail_images_stmt FROM @hotel_detail_images_sql;
+EXECUTE hotel_detail_images_stmt;
+DEALLOCATE PREPARE hotel_detail_images_stmt;
+
 CREATE TABLE IF NOT EXISTS `hotel_room` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,
     `hotel_id` BIGINT NOT NULL,
@@ -313,6 +329,22 @@ CREATE TABLE IF NOT EXISTS `tour_package` (
     PRIMARY KEY (`id`),
     KEY `idx_tour_destination_status` (`destination`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+SET @tour_detail_images_exists = (
+    SELECT COUNT(*)
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'tour_package'
+      AND COLUMN_NAME = 'detail_images'
+);
+SET @tour_detail_images_sql = IF(
+    @tour_detail_images_exists = 0,
+    'ALTER TABLE `tour_package` ADD COLUMN `detail_images` TEXT DEFAULT NULL AFTER `cover_image`',
+    'SELECT 1'
+);
+PREPARE tour_detail_images_stmt FROM @tour_detail_images_sql;
+EXECUTE tour_detail_images_stmt;
+DEALLOCATE PREPARE tour_detail_images_stmt;
 
 CREATE TABLE IF NOT EXISTS `trip_plan` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,

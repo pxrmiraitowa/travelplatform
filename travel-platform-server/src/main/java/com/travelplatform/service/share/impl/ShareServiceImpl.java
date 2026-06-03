@@ -12,66 +12,44 @@ import com.travelplatform.mapper.ShareImageMapper;
 import com.travelplatform.mapper.SharePostMapper;
 import com.travelplatform.mapper.UserMapper;
 import com.travelplatform.security.SecurityUtils;
+import com.travelplatform.service.media.MediaUploadService;
 import com.travelplatform.service.share.ShareService;
 import com.travelplatform.vo.common.PageResult;
 import com.travelplatform.vo.share.SharePostDetailVO;
 import com.travelplatform.vo.share.SharePostListItemVO;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
 public class ShareServiceImpl implements ShareService {
 
-    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of("image/jpeg", "image/png", "image/webp", "image/gif");
-    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(".jpg", ".jpeg", ".png", ".webp", ".gif");
-    private static final long MAX_FILE_SIZE = 5L * 1024 * 1024;
     private static final int STATUS_VISIBLE = 1;
 
     private final SharePostMapper sharePostMapper;
     private final ShareImageMapper shareImageMapper;
     private final UserMapper userMapper;
-    private final Path uploadDir;
+    private final MediaUploadService mediaUploadService;
 
     public ShareServiceImpl(SharePostMapper sharePostMapper,
                             ShareImageMapper shareImageMapper,
                             UserMapper userMapper,
-                            @Value("${travel.upload-dir:./uploads}") String uploadDir) {
+                            MediaUploadService mediaUploadService) {
         this.sharePostMapper = sharePostMapper;
         this.shareImageMapper = shareImageMapper;
         this.userMapper = userMapper;
-        this.uploadDir = Paths.get(uploadDir).toAbsolutePath().normalize();
+        this.mediaUploadService = mediaUploadService;
     }
 
     @Override
     public String uploadShareImage(MultipartFile file) {
-        validateImage(file);
-        String extension = resolveExtension(file.getOriginalFilename());
-        String dateFolder = LocalDate.now().toString().replace("-", "");
-        Path targetDirectory = uploadDir.resolve(Paths.get("share", dateFolder)).normalize();
-        String fileName = UUID.randomUUID().toString().replace("-", "") + extension;
-        Path targetFile = targetDirectory.resolve(fileName).normalize();
-        try {
-            Files.createDirectories(targetDirectory);
-            file.transferTo(targetFile);
-        } catch (IOException ex) {
-            throw new BusinessException(ResultCode.SYSTEM_ERROR.getCode(), "图片上传失败");
-        }
-        return "/api/public/uploads/share/" + dateFolder + "/" + fileName;
+        return mediaUploadService.uploadImage("share", file);
     }
 
     @Override
@@ -204,30 +182,6 @@ public class ShareServiceImpl implements ShareService {
         shareImageMapper.selectList(new LambdaQueryWrapper<ShareImage>().in(ShareImage::getPostId, postIds))
                 .forEach(image -> countMap.merge(image.getPostId(), 1, Integer::sum));
         return countMap;
-    }
-
-    private void validateImage(MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "请上传图片文件");
-        }
-        if (file.getSize() > MAX_FILE_SIZE) {
-            throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "图片大小不能超过5MB");
-        }
-        if (!ALLOWED_CONTENT_TYPES.contains(file.getContentType())) {
-            throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "仅支持 jpg、png、webp、gif 图片");
-        }
-        resolveExtension(file.getOriginalFilename());
-    }
-
-    private String resolveExtension(String filename) {
-        if (!StringUtils.hasText(filename) || !filename.contains(".")) {
-            throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "图片文件名不合法");
-        }
-        String extension = filename.substring(filename.lastIndexOf('.')).toLowerCase();
-        if (!ALLOWED_EXTENSIONS.contains(extension)) {
-            throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "图片格式不支持");
-        }
-        return extension;
     }
 
     private String resolveNickname(User user) {

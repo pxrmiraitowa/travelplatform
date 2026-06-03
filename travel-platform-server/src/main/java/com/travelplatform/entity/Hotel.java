@@ -16,6 +16,7 @@ public class Hotel extends BaseEntity {
     private String description;
     private Integer starLevel;
     private String coverImage;
+    private String detailImages;
     private String checkInTime;
     private String checkOutTime;
     private Integer status;
@@ -82,6 +83,14 @@ public class Hotel extends BaseEntity {
 
     public void setCoverImage(String coverImage) {
         this.coverImage = coverImage;
+    }
+
+    public String getDetailImages() {
+        return detailImages;
+    }
+
+    public void setDetailImages(String detailImages) {
+        this.detailImages = detailImages;
     }
 
     public String getCheckInTime() {

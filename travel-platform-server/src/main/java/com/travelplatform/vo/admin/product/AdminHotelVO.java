@@ -12,6 +12,7 @@ public class AdminHotelVO {
     private String description;
     private Integer starLevel;
     private String coverImage;
+    private String detailImages;
     private String checkInTime;
     private String checkOutTime;
     private Integer status;
@@ -33,6 +34,8 @@ public class AdminHotelVO {
     public void setStarLevel(Integer starLevel) { this.starLevel = starLevel; }
     public String getCoverImage() { return coverImage; }
     public void setCoverImage(String coverImage) { this.coverImage = coverImage; }
+    public String getDetailImages() { return detailImages; }
+    public void setDetailImages(String detailImages) { this.detailImages = detailImages; }
     public String getCheckInTime() { return checkInTime; }
     public void setCheckInTime(String checkInTime) { this.checkInTime = checkInTime; }
     public String getCheckOutTime() { return checkOutTime; }
