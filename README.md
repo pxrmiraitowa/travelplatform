@@ -37,7 +37,39 @@
 - MySQL 8.x
 - Node.js 18+ 或兼容版本
 
-### 3.2 后端启动
+### 3.2 推荐：一键启动前后端
+
+项目根目录已提供以下启动脚本：
+
+- `start-dev.ps1`
+- `start-dev.cmd`
+
+推荐在 Windows 环境下直接使用，脚本会自动：
+
+- 检查 `mvn` 与 `npm` 是否可用
+- 分别打开两个终端窗口
+- 启动后端 `mvn spring-boot:run`
+- 启动前端 `npm run dev`
+
+使用方式一：在项目根目录执行 PowerShell 脚本
+
+```powershell
+.\start-dev.ps1
+```
+
+使用方式二：直接双击运行
+
+```text
+start-dev.cmd
+```
+
+启动成功后可访问：
+
+- 前端页面：`http://localhost:5173`
+- 后端接口：`http://localhost:8080`
+- Swagger：`http://localhost:8080/swagger-ui.html`
+
+### 3.3 后端单独启动
 
 后端目录：
 
@@ -67,14 +99,15 @@ mvn spring-boot:run
 - 会自动建表并插入一批演示数据
 - 图片上传目录默认是后端目录下的 `uploads`
 
-#### 新编：如果jdk版本是24，后端的启动用下述方案
+#### 补充：如果 JDK 版本是 24，后端可改用下述方案
+
 ```powershell
 cd travel-platform-server
 mvn package "-DskipTests"
 java -jar target\travel-platform-server-0.0.1-SNAPSHOT.jar
 ```
 
-### 3.3 前端启动
+### 3.4 前端单独启动
 
 前端目录：
 
@@ -97,6 +130,7 @@ npm run dev
 前端已配置代理：
 
 - `/api` 会代理到 `http://localhost:8080`
+- 因此前端单独启动时，仍需要保证后端服务已启动
 
 ## 4. 默认演示账号
 
