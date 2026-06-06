@@ -603,6 +603,24 @@ INSERT INTO `hotel` (`hotel_name`, `city`, `district`, `address`, `description`,
 SELECT '上海地铁花园酒店', '上海', '静安区', '南京西路66号', '用于价格对比演示的市中心酒店样例。', 5, '', '14:00', '12:00', 1
 WHERE NOT EXISTS (SELECT 1 FROM `hotel` WHERE `hotel_name` = '上海地铁花园酒店');
 
+UPDATE `hotel`
+SET
+    `hotel_name` = '上海外滩精选酒店',
+    `city` = '上海',
+    `district` = '黄浦区',
+    `address` = '中山东一路188号',
+    `description` = '用于价格对比演示的外滩商圈酒店样例。'
+WHERE `hotel_name` IN ('Shanghai Bund Select Hotel', '上海外滩精选酒店');
+
+UPDATE `hotel`
+SET
+    `hotel_name` = '上海地铁花园酒店',
+    `city` = '上海',
+    `district` = '静安区',
+    `address` = '南京西路66号',
+    `description` = '用于价格对比演示的市中心酒店样例。'
+WHERE `hotel_name` IN ('Shanghai Metro Garden Hotel', '上海地铁花园酒店');
+
 INSERT INTO `hotel_room` (`hotel_id`, `room_name`, `bed_type`, `breakfast`, `room_area`, `guest_count`, `price`, `stock`, `cancel_rule`, `status`)
 SELECT h.id, '豪华大床房', '1张特大床', '含双早', '35平方米', 2, 618.00, 10, '入住前一天18:00前可免费取消', 1
 FROM `hotel` h

@@ -23,16 +23,20 @@ WHERE `flight_no` = 'HO1257'
 UPDATE `hotel`
 SET
     `hotel_name` = '上海外滩精选酒店',
+    `city` = '上海',
+    `district` = '黄浦区',
     `address` = '中山东一路188号',
     `description` = '用于价格对比演示的外滩商圈酒店样例。'
-WHERE `hotel_name` = 'Shanghai Bund Select Hotel';
+WHERE `hotel_name` IN ('Shanghai Bund Select Hotel', '上海外滩精选酒店');
 
 UPDATE `hotel`
 SET
     `hotel_name` = '上海地铁花园酒店',
+    `city` = '上海',
+    `district` = '静安区',
     `address` = '南京西路66号',
     `description` = '用于价格对比演示的市中心酒店样例。'
-WHERE `hotel_name` = 'Shanghai Metro Garden Hotel';
+WHERE `hotel_name` IN ('Shanghai Metro Garden Hotel', '上海地铁花园酒店');
 
 UPDATE `hotel_room`
 SET

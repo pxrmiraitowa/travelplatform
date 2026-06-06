@@ -5,15 +5,15 @@ import jakarta.validation.constraints.Size;
 
 public class FlightOrderCreateRequest {
 
-    @NotNull(message = "鑸彮涓嶈兘涓虹┖")
+    @NotNull(message = "航班不能为空")
     private Long flightId;
 
-    @NotNull(message = "涔樻満浜轰笉鑳戒负绌?")
+    @NotNull(message = "乘机人不能为空")
     private Long contactId;
 
     private Long couponId;
 
-    @Size(max = 255, message = "澶囨敞闀垮害涓嶈兘瓒呰繃255涓瓧绗?")
+    @Size(max = 255, message = "备注长度不能超过255个字符")
     private String remark;
 
     public Long getFlightId() {

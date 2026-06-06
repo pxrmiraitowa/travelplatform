@@ -8,26 +8,26 @@ import java.time.LocalDate;
 
 public class HotelOrderCreateRequest {
 
-    @NotNull(message = "閰掑簵涓嶈兘涓虹┖")
+    @NotNull(message = "酒店不能为空")
     private Long hotelId;
 
-    @NotNull(message = "鎴垮瀷涓嶈兘涓虹┖")
+    @NotNull(message = "房型不能为空")
     private Long hotelRoomId;
 
-    @NotNull(message = "鍏ヤ綇鏃ユ湡涓嶈兘涓虹┖")
+    @NotNull(message = "入住日期不能为空")
     @DateTimeFormat(pattern = "yyyy-MM-dd")
     private LocalDate checkInDate;
 
-    @NotNull(message = "绂诲簵鏃ユ湡涓嶈兘涓虹┖")
+    @NotNull(message = "离店日期不能为空")
     @DateTimeFormat(pattern = "yyyy-MM-dd")
     private LocalDate checkOutDate;
 
-    @NotNull(message = "鍏ヤ綇浜轰笉鑳戒负绌?")
+    @NotNull(message = "入住人不能为空")
     private Long contactId;
 
     private Long couponId;
 
-    @Size(max = 255, message = "澶囨敞闀垮害涓嶈兘瓒呰繃255涓瓧绗?")
+    @Size(max = 255, message = "备注长度不能超过255个字符")
     private String remark;
 
     public Long getHotelId() {

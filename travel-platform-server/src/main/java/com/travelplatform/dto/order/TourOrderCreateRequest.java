@@ -8,19 +8,19 @@ import java.time.LocalDate;
 
 public class TourOrderCreateRequest {
 
-    @NotNull(message = "鏃呮父浜у搧涓嶈兘涓虹┖")
+    @NotNull(message = "旅游产品不能为空")
     private Long tourPackageId;
 
-    @NotNull(message = "鍑鸿鏃ユ湡涓嶈兘涓虹┖")
+    @NotNull(message = "出行日期不能为空")
     @DateTimeFormat(pattern = "yyyy-MM-dd")
     private LocalDate travelDate;
 
-    @NotNull(message = "鍑鸿浜轰笉鑳戒负绌?")
+    @NotNull(message = "出行人不能为空")
     private Long contactId;
 
     private Long couponId;
 
-    @Size(max = 255, message = "澶囨敞闀垮害涓嶈兘瓒呰繃255涓瓧绗?")
+    @Size(max = 255, message = "备注长度不能超过255个字符")
     private String remark;
 
     public Long getTourPackageId() {
