@@ -17,7 +17,7 @@ spring:
   sql:
     init:
       mode: always
-      schema-locations: classpath:sql/schema.sql
+      schema-locations: classpath:sql/schema.sql,classpath:sql/ai_trip_plan.sql
 
 mybatis-plus:
   configuration:
@@ -44,3 +44,13 @@ security:
 
 travel:
   upload-dir: ./uploads
+
+ai:
+  planner:
+    enabled: ${AI_PLANNER_ENABLED:true}
+    base-url: ${AI_BASE_URL:https://api.openai.com/v1}
+    api-key: ${AI_API_KEY:}
+    model: ${AI_MODEL:gpt-4.1-mini}
+    timeout-seconds: ${AI_TIMEOUT_SECONDS:20}
+    candidate-limit: ${AI_CANDIDATE_LIMIT:18}
+    max-attractions-per-day: ${AI_MAX_ATTRACTIONS_PER_DAY:3}

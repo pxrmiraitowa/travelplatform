@@ -37,6 +37,22 @@ export function deleteTripPlan(id) {
   })
 }
 
+export function previewAiTripPlan(data) {
+  return request({
+    url: '/trip-plans/ai-preview',
+    method: 'post',
+    data
+  })
+}
+
+export function saveAiTripPlan(data) {
+  return request({
+    url: '/trip-plans/ai-save',
+    method: 'post',
+    data
+  })
+}
+
 export function createTripPlanItem(planId, data) {
   return request({
     url: `/trip-plans/${planId}/items`,

@@ -1,8 +1,14 @@
 <template>
   <div class="trip-plan-page">
-    <SectionCard title="行程规划系统" description="创建多日旅行计划，维护每日安排，并从详情页查看可视化行程步骤图。">
+    <SectionCard
+      title="行程规划系统"
+      description="创建多日旅行计划，维护每日安排，也可以借助 AI 先生成景点预览，再一键保存到我的行程规划。"
+    >
       <template #extra>
-        <el-button type="primary" @click="openCreateDialog">新建旅行计划</el-button>
+        <div class="header-actions">
+          <el-button @click="openAiDialog">AI 生成行程</el-button>
+          <el-button type="primary" @click="openCreateDialog">新建旅行计划</el-button>
+        </div>
       </template>
 
       <el-empty v-if="!loading && !plans.length" description="还没有旅行计划，先创建一个吧。" />
@@ -14,7 +20,9 @@
               <h3>{{ plan.planName }}</h3>
               <p>{{ formatDate(plan.startDate) }} · {{ plan.totalDays }} 天 · 已安排 {{ plan.itemCount }} 天</p>
             </div>
-            <el-tag size="small" type="success">{{ sourceTypeText(plan.sourceType) }}</el-tag>
+            <el-tag size="small" :type="plan.sourceType === 'AI' ? 'warning' : 'success'">
+              {{ sourceTypeText(plan.sourceType) }}
+            </el-tag>
           </div>
 
           <p class="plan-card__remark">{{ plan.remark || '暂无整体备注，可进入详情页继续补充。' }}</p>
@@ -66,24 +74,152 @@
         <el-button type="primary" :loading="submitting" @click="handleSubmit">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="aiDialogVisible" title="AI 生成行程" width="920px" destroy-on-close class="ai-dialog">
+      <div class="ai-planner">
+        <el-form ref="aiFormRef" :model="aiForm" :rules="aiRules" label-width="100px" class="ai-form">
+          <el-row :gutter="16">
+            <el-col :md="12" :xs="24">
+              <el-form-item label="目的地" prop="destination">
+                <el-select v-model="aiForm.destination" placeholder="请选择目的地" filterable style="width: 100%;">
+                  <el-option
+                    v-for="city in destinationOptions"
+                    :key="city"
+                    :label="city"
+                    :value="city"
+                  />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :md="12" :xs="24">
+              <el-form-item label="停留天数" prop="totalDays">
+                <el-input-number v-model="aiForm.totalDays" :min="1" :max="10" controls-position="right" />
+              </el-form-item>
+            </el-col>
+            <el-col :md="12" :xs="24">
+              <el-form-item label="出发日期">
+                <el-date-picker
+                  v-model="aiForm.startDate"
+                  type="date"
+                  value-format="YYYY-MM-DD"
+                  placeholder="可选"
+                  style="width: 100%;"
+                />
+              </el-form-item>
+            </el-col>
+            <el-col :md="12" :xs="24">
+              <el-form-item label="旅游偏好">
+                <el-select
+                  v-model="aiForm.preferences"
+                  multiple
+                  collapse-tags
+                  collapse-tags-tooltip
+                  placeholder="可多选"
+                  style="width: 100%;"
+                >
+                  <el-option
+                    v-for="preference in preferenceOptions"
+                    :key="preference"
+                    :label="preference"
+                    :value="preference"
+                  />
+                </el-select>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </el-form>
+
+        <div class="ai-toolbar">
+          <el-button type="primary" :loading="aiGenerating" @click="handleGeneratePreview">生成预览</el-button>
+        </div>
+
+        <div v-if="aiPreview" class="ai-preview">
+          <div class="preview-head">
+            <div>
+              <h3>{{ aiPreview.planName }}</h3>
+              <p>{{ aiPreview.destination }} · {{ aiPreview.totalDays }} 天 · {{ previewPreferenceText }}</p>
+            </div>
+          </div>
+
+          <div class="preview-days">
+            <article v-for="day in aiPreview.days" :key="day.dayNo" class="preview-day-card">
+              <div class="preview-day-head">
+                <div>
+                  <strong>Day {{ day.dayNo }}</strong>
+                  <h4>{{ day.destination }}</h4>
+                </div>
+              </div>
+
+              <p class="preview-reason">{{ day.reason }}</p>
+
+              <ul class="preview-attractions">
+                <li v-for="attraction in day.attractions" :key="attraction.id">
+                  <div class="preview-attraction-title">
+                    <span>{{ attraction.attractionName }}</span>
+                    <small>{{ attraction.suggestedDuration || '建议半日游' }}</small>
+                  </div>
+                  <p>{{ attraction.description }}</p>
+                  <div class="preview-tags">
+                    <el-tag
+                      v-for="tag in attraction.tags || []"
+                      :key="`${attraction.id}-${tag}`"
+                      size="small"
+                      effect="plain"
+                    >
+                      {{ tag }}
+                    </el-tag>
+                  </div>
+                </li>
+              </ul>
+            </article>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <el-button @click="aiDialogVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="!aiPreview" :loading="aiSaving" @click="handleSaveAiPlan">
+          一键保存到行程规划
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import SectionCard from '@/components/SectionCard.vue'
-import { createTripPlan, deleteTripPlan, getTripPlanList, updateTripPlan } from '@/api/tripPlan'
+import {
+  createTripPlan,
+  deleteTripPlan,
+  getTripPlanList,
+  previewAiTripPlan,
+  saveAiTripPlan,
+  updateTripPlan
+} from '@/api/tripPlan'
 
 const router = useRouter()
 const loading = ref(false)
 const submitting = ref(false)
 const dialogVisible = ref(false)
+const aiDialogVisible = ref(false)
 const editingId = ref(null)
 const planFormRef = ref()
+const aiFormRef = ref()
 const plans = ref([])
+const aiGenerating = ref(false)
+const aiSaving = ref(false)
+const aiPreview = ref(null)
+
+const destinationOptions = [
+  '北京', '上海', '杭州', '成都', '西安', '重庆',
+  '广州', '深圳', '南京', '苏州', '三亚', '桂林'
+]
+
+const preferenceOptions = ['自然风光', '人文历史', '美食', '亲子', '休闲', '城市地标']
 
 const planForm = reactive({
   planName: '',
@@ -92,10 +228,27 @@ const planForm = reactive({
   remark: ''
 })
 
+const aiForm = reactive({
+  destination: '',
+  totalDays: 3,
+  startDate: '',
+  preferences: ['自然风光']
+})
+
 const planRules = {
   planName: [{ required: true, message: '请输入计划名称', trigger: 'blur' }],
   totalDays: [{ required: true, message: '请输入总天数', trigger: 'change' }]
 }
+
+const aiRules = {
+  destination: [{ required: true, message: '请选择目的地', trigger: 'change' }],
+  totalDays: [{ required: true, message: '请输入停留天数', trigger: 'change' }]
+}
+
+const previewPreferenceText = computed(() => {
+  const preferences = aiPreview.value?.preferences || []
+  return preferences.length ? preferences.join(' / ') : '综合推荐'
+})
 
 function resetForm() {
   editingId.value = null
@@ -103,6 +256,10 @@ function resetForm() {
   planForm.totalDays = 3
   planForm.startDate = ''
   planForm.remark = ''
+}
+
+function resetAiPreview() {
+  aiPreview.value = null
 }
 
 async function loadPlans() {
@@ -118,6 +275,11 @@ async function loadPlans() {
 function openCreateDialog() {
   resetForm()
   dialogVisible.value = true
+}
+
+function openAiDialog() {
+  resetAiPreview()
+  aiDialogVisible.value = true
 }
 
 function openEditDialog(plan) {
@@ -157,6 +319,56 @@ async function handleSubmit() {
   }
 }
 
+async function handleGeneratePreview() {
+  const valid = await aiFormRef.value.validate().catch(() => false)
+  if (!valid) {
+    return
+  }
+
+  aiGenerating.value = true
+  try {
+    const response = await previewAiTripPlan({
+      destination: aiForm.destination,
+      totalDays: aiForm.totalDays,
+      startDate: aiForm.startDate || null,
+      preferences: aiForm.preferences
+    })
+    aiPreview.value = response.data
+    ElMessage.success('AI 行程预览已生成')
+  } finally {
+    aiGenerating.value = false
+  }
+}
+
+async function handleSaveAiPlan() {
+  if (!aiPreview.value) {
+    return
+  }
+
+  aiSaving.value = true
+  try {
+    const response = await saveAiTripPlan({
+      planName: aiPreview.value.planName,
+      destination: aiPreview.value.destination,
+      totalDays: aiPreview.value.totalDays,
+      startDate: aiPreview.value.startDate || null,
+      preferences: aiPreview.value.preferences || [],
+      days: (aiPreview.value.days || []).map((day) => ({
+        dayNo: day.dayNo,
+        attractionIds: (day.attractions || []).map((attraction) => attraction.id),
+        reason: day.reason
+      }))
+    })
+    ElMessage.success('AI 行程已保存到行程规划')
+    aiDialogVisible.value = false
+    resetAiPreview()
+    await loadPlans()
+    router.push(`/trip-plans/${response.data.id}`)
+  } finally {
+    aiSaving.value = false
+  }
+}
+
 function goDetail(id) {
   router.push(`/trip-plans/${id}`)
 }
@@ -179,6 +391,9 @@ function formatDateTime(value) {
 }
 
 function sourceTypeText(value) {
+  if (value === 'AI') {
+    return 'AI 生成'
+  }
   return value === 'MANUAL' ? '手动规划' : value
 }
 
@@ -191,6 +406,12 @@ onMounted(() => {
 .trip-plan-page {
   display: grid;
   gap: 24px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .plan-grid {
@@ -243,5 +464,126 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.ai-planner {
+  display: grid;
+  gap: 18px;
+}
+
+.ai-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.ai-preview {
+  display: grid;
+  gap: 18px;
+}
+
+.preview-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 20px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #f8fcff 0%, #eef6ff 100%);
+  border: 1px solid #dce9f8;
+}
+
+.preview-head h3 {
+  margin: 0 0 6px;
+  color: #12314d;
+}
+
+.preview-head p {
+  margin: 0;
+  color: #607086;
+}
+
+.preview-days {
+  display: grid;
+  gap: 16px;
+}
+
+.preview-day-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid #e4ebf5;
+  background: #fff;
+}
+
+.preview-day-head strong {
+  color: #125fba;
+  font-size: 14px;
+}
+
+.preview-day-head h4 {
+  margin: 6px 0 0;
+  font-size: 20px;
+  color: #12314d;
+}
+
+.preview-reason {
+  margin: 0;
+  color: #4a6078;
+  line-height: 1.8;
+}
+
+.preview-attractions {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.preview-attractions li {
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: #f8fbff;
+  border: 1px solid #e8f0fb;
+}
+
+.preview-attraction-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 8px;
+  color: #10243a;
+  font-weight: 700;
+}
+
+.preview-attraction-title small {
+  color: #6b7a90;
+  font-weight: 500;
+}
+
+.preview-attractions p {
+  margin: 0;
+  color: #506277;
+  line-height: 1.75;
+}
+
+.preview-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+@media (max-width: 768px) {
+  .preview-head,
+  .preview-attraction-title {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 </style>
