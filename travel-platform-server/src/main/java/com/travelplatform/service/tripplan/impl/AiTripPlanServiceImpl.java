@@ -26,11 +26,13 @@ import com.travelplatform.vo.tripplan.TripPlanItemVO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -43,6 +45,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
@@ -52,6 +55,7 @@ public class AiTripPlanServiceImpl implements AiTripPlanService {
     private static final String SOURCE_TYPE_AI = "AI";
     private static final String GENERATION_MODE_AI = "AI_ENHANCED";
     private static final String GENERATION_MODE_FALLBACK = "LOCAL_FALLBACK";
+    private static final String RESPONSE_SCHEMA_NAME = "trip_plan_days";
     private static final Map<String, List<String>> PREFERENCE_KEYWORDS = buildPreferenceKeywords();
 
     private final AttractionMapper attractionMapper;
@@ -86,13 +90,14 @@ public class AiTripPlanServiceImpl implements AiTripPlanService {
         String generationMode = GENERATION_MODE_FALLBACK;
         if (isAiAvailable()) {
             try {
-                List<DayPlan> aiPlan = requestAiOptimization(request, candidates, localPlan);
+                List<DayPlan> aiPlan = requestAiOptimization(request, candidates, localPlan, preferences);
                 if (!aiPlan.isEmpty()) {
                     finalPlan = aiPlan;
                     generationMode = GENERATION_MODE_AI;
                 }
             } catch (Exception exception) {
-                log.warn("AI trip plan preview fallback triggered: {}", exception.getMessage());
+                log.warn("AI trip plan preview fallback triggered. destination={}, model={}, message={}",
+                        normalizedDestination, properties.getModel(), exception.getMessage(), exception);
             }
         }
 
@@ -113,7 +118,7 @@ public class AiTripPlanServiceImpl implements AiTripPlanService {
     public TripPlanDetailVO savePlan(AiTripPlanSaveRequest request) {
         List<AiTripPlanSaveDayRequest> days = request.getDays() == null ? List.of() : request.getDays();
         if (request.getTotalDays() == null || request.getTotalDays() < 1 || request.getTotalDays() > 10) {
-            throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "停留天数必须在1到10天之间");
+            throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "停留天数必须在 1 到 10 天之间");
         }
         if (days.isEmpty()) {
             throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "预览数据不能为空");
@@ -146,7 +151,7 @@ public class AiTripPlanServiceImpl implements AiTripPlanService {
             }
             for (Long attractionId : day.getAttractionIds()) {
                 if (!usedAttractionIds.add(attractionId)) {
-                    throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "同一个景点不能在多天重复保存");
+                    throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "同一景点不能在多天重复保存");
                 }
                 Attraction attraction = attractionMap.get(attractionId);
                 if (attraction == null || !Integer.valueOf(1).equals(attraction.getStatus())) {
@@ -278,31 +283,62 @@ public class AiTripPlanServiceImpl implements AiTripPlanService {
 
     private List<DayPlan> requestAiOptimization(AiTripPlanPreviewRequest request,
                                                 List<Attraction> candidates,
-                                                List<DayPlan> localPlan) throws Exception {
+                                                List<DayPlan> localPlan,
+                                                List<String> preferences) throws Exception {
         String prompt = buildPrompt(request, candidates, localPlan);
+        RestClient restClient = buildRestClient();
+        try {
+            return requestAiOptimization(restClient, request, candidates, preferences, prompt,
+                    properties.isUseJsonSchemaResponseFormat());
+        } catch (Exception exception) {
+            if (properties.isUseJsonSchemaResponseFormat()) {
+                log.warn("AI structured response attempt failed, retrying without response_format. destination={}, model={}, message={}",
+                        normalizeCity(request.getDestination()), properties.getModel(), exception.getMessage());
+                return requestAiOptimization(restClient, request, candidates, preferences, prompt, false);
+            }
+            throw exception;
+        }
+    }
+
+    private List<DayPlan> requestAiOptimization(RestClient restClient,
+                                                AiTripPlanPreviewRequest request,
+                                                List<Attraction> candidates,
+                                                List<String> preferences,
+                                                String prompt,
+                                                boolean useResponseFormat) throws Exception {
+        JsonNode responseNode = requestChatCompletion(restClient, prompt, useResponseFormat);
+        String content = extractChatContent(responseNode);
+        return parseAiPlan(content, request.getTotalDays(), candidates, preferences);
+    }
+
+    private RestClient buildRestClient() {
         RestClient restClient = RestClient.builder()
                 .baseUrl(trimTrailingSlash(properties.getBaseUrl()))
+                .requestFactory(buildRequestFactory())
                 .defaultHeader("Authorization", "Bearer " + properties.getApiKey().trim())
                 .defaultHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE)
                 .build();
+        return restClient;
+    }
 
+    private JsonNode requestChatCompletion(RestClient restClient, String prompt, boolean useResponseFormat) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("model", properties.getModel());
         payload.put("temperature", 0.3);
         payload.put("messages", List.of(
-                Map.of("role", "system", "content", "你是一个严谨的旅行规划助手，只能使用给定候选景点并输出合法 JSON。"),
+                Map.of("role", "system", "content", "你是一个严谨的旅行规划助手，只能使用给定候选景点，并输出合法 JSON。"),
                 Map.of("role", "user", "content", prompt)
         ));
+        if (useResponseFormat) {
+            payload.put("response_format", buildJsonSchemaResponseFormat());
+        }
 
-        JsonNode responseNode = restClient.post()
-                .uri("/chat/completions")
+        return restClient.post()
+                .uri(buildChatCompletionsUri())
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(payload)
                 .retrieve()
                 .body(JsonNode.class);
-
-        String content = extractChatContent(responseNode);
-        return parseAiPlan(content, request.getTotalDays(), candidates);
     }
 
     private String buildPrompt(AiTripPlanPreviewRequest request,
@@ -344,14 +380,40 @@ public class AiTripPlanServiceImpl implements AiTripPlanService {
         if (!choices.isArray() || choices.isEmpty()) {
             throw new IllegalStateException("AI response choices missing");
         }
-        String content = choices.get(0).path("message").path("content").asText(null);
+        String content = extractMessageContent(choices.get(0).path("message").path("content"));
         if (!StringUtils.hasText(content)) {
             throw new IllegalStateException("AI content missing");
         }
         return content.trim();
     }
 
-    private List<DayPlan> parseAiPlan(String content, Integer totalDays, List<Attraction> candidates) throws Exception {
+    private String extractMessageContent(JsonNode contentNode) {
+        if (contentNode == null || contentNode.isMissingNode() || contentNode.isNull()) {
+            return null;
+        }
+        if (contentNode.isTextual()) {
+            return contentNode.asText();
+        }
+        if (contentNode.isArray()) {
+            StringBuilder builder = new StringBuilder();
+            for (JsonNode part : contentNode) {
+                String text = part.path("text").asText(null);
+                if (StringUtils.hasText(text)) {
+                    if (builder.length() > 0) {
+                        builder.append('\n');
+                    }
+                    builder.append(text.trim());
+                }
+            }
+            return builder.toString();
+        }
+        return contentNode.toString();
+    }
+
+    private List<DayPlan> parseAiPlan(String content,
+                                      Integer totalDays,
+                                      List<Attraction> candidates,
+                                      List<String> preferences) throws Exception {
         String jsonContent = stripMarkdownJsonFence(content);
         JsonNode root = objectMapper.readTree(jsonContent);
         ArrayNode daysNode = root.has("days") && root.get("days").isArray()
@@ -364,15 +426,17 @@ public class AiTripPlanServiceImpl implements AiTripPlanService {
         Map<Long, Attraction> candidateMap = candidates.stream()
                 .collect(Collectors.toMap(Attraction::getId, attraction -> attraction));
         Set<Long> usedAttractionIds = new HashSet<>();
+        Set<Integer> dayNos = new HashSet<>();
         List<DayPlan> dayPlans = new ArrayList<>();
 
         for (JsonNode dayNode : daysNode) {
             int dayNo = dayNode.path("dayNo").asInt(0);
-            if (dayNo < 1 || dayNo > totalDays) {
+            if (dayNo < 1 || dayNo > totalDays || !dayNos.add(dayNo)) {
                 return List.of();
             }
             JsonNode attractionIdsNode = dayNode.path("attractionIds");
-            if (!attractionIdsNode.isArray() || attractionIdsNode.isEmpty()) {
+            if (!attractionIdsNode.isArray() || attractionIdsNode.isEmpty()
+                    || attractionIdsNode.size() > properties.getMaxAttractionsPerDay()) {
                 return List.of();
             }
             List<Attraction> dayAttractions = new ArrayList<>();
@@ -386,9 +450,9 @@ public class AiTripPlanServiceImpl implements AiTripPlanService {
             }
             String reason = dayNode.path("reason").asText("");
             if (!StringUtils.hasText(reason)) {
-                reason = buildFallbackReason(dayNo, List.of(), dayAttractions);
+                reason = buildFallbackReason(dayNo, preferences, dayAttractions);
             }
-            dayPlans.add(new DayPlan(dayNo, dayAttractions, truncate(reason, 255)));
+            dayPlans.add(new DayPlan(dayNo, dayAttractions, truncate(reason.trim(), 255)));
         }
 
         if (dayPlans.size() != totalDays) {
@@ -469,7 +533,10 @@ public class AiTripPlanServiceImpl implements AiTripPlanService {
     }
 
     private boolean isAiAvailable() {
-        return properties.isEnabled() && StringUtils.hasText(properties.getApiKey()) && StringUtils.hasText(properties.getBaseUrl());
+        return properties.isEnabled()
+                && StringUtils.hasText(properties.getApiKey())
+                && StringUtils.hasText(properties.getBaseUrl())
+                && StringUtils.hasText(properties.getModel());
     }
 
     private String trimTrailingSlash(String value) {
@@ -477,6 +544,63 @@ public class AiTripPlanServiceImpl implements AiTripPlanService {
             return value;
         }
         return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
+    }
+
+    private SimpleClientHttpRequestFactory buildRequestFactory() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        int timeoutMillis = (int) TimeUnit.SECONDS.toMillis(Math.max(1, properties.getTimeoutSeconds()));
+        factory.setConnectTimeout(timeoutMillis);
+        factory.setReadTimeout(timeoutMillis);
+        return factory;
+    }
+
+    private URI buildChatCompletionsUri() {
+        String path = properties.getChatCompletionsPath();
+        if (!StringUtils.hasText(path)) {
+            path = "/chat/completions";
+        }
+        if (path.startsWith("http://") || path.startsWith("https://")) {
+            return URI.create(path);
+        }
+        String baseUrl = trimTrailingSlash(properties.getBaseUrl());
+        String normalizedPath = path.startsWith("/") ? path : "/" + path;
+        return URI.create(baseUrl + normalizedPath);
+    }
+
+    private Map<String, Object> buildJsonSchemaResponseFormat() {
+        Map<String, Object> schema = new LinkedHashMap<>();
+        schema.put("type", "object");
+        schema.put("additionalProperties", false);
+        schema.put("required", List.of("days"));
+        schema.put("properties", Map.of(
+                "days", Map.of(
+                        "type", "array",
+                        "minItems", 1,
+                        "items", Map.of(
+                                "type", "object",
+                                "additionalProperties", false,
+                                "required", List.of("dayNo", "attractionIds", "reason"),
+                                "properties", Map.of(
+                                        "dayNo", Map.of("type", "integer", "minimum", 1),
+                                        "attractionIds", Map.of(
+                                                "type", "array",
+                                                "minItems", 1,
+                                                "items", Map.of("type", "integer", "minimum", 1)
+                                        ),
+                                        "reason", Map.of("type", "string")
+                                )
+                        )
+                )
+        ));
+
+        return Map.of(
+                "type", "json_schema",
+                "json_schema", Map.of(
+                        "name", RESPONSE_SCHEMA_NAME,
+                        "strict", true,
+                        "schema", schema
+                )
+        );
     }
 
     private String normalizeCity(String city) {
@@ -512,7 +636,7 @@ public class AiTripPlanServiceImpl implements AiTripPlanService {
             if (!StringUtils.hasText(rawValue)) {
                 continue;
             }
-            for (String piece : rawValue.split("[,，、/\\s]+")) {
+            for (String piece : rawValue.split("[,，、\\s]+")) {
                 if (StringUtils.hasText(piece)) {
                     keywords.add(piece.trim().toLowerCase(Locale.ROOT));
                 }

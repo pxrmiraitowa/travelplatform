@@ -139,6 +139,9 @@
               <h3>{{ aiPreview.planName }}</h3>
               <p>{{ aiPreview.destination }} · {{ aiPreview.totalDays }} 天 · {{ previewPreferenceText }}</p>
             </div>
+            <el-tag :type="previewGenerationTagType" effect="dark" round>
+              {{ previewGenerationTagText }}
+            </el-tag>
           </div>
 
           <div class="preview-days">
@@ -248,6 +251,14 @@ const aiRules = {
 const previewPreferenceText = computed(() => {
   const preferences = aiPreview.value?.preferences || []
   return preferences.length ? preferences.join(' / ') : '综合推荐'
+})
+
+const previewGenerationTagText = computed(() => {
+  return aiPreview.value?.generationMode === 'AI_ENHANCED' ? 'AI增强' : '本地生成'
+})
+
+const previewGenerationTagType = computed(() => {
+  return aiPreview.value?.generationMode === 'AI_ENHANCED' ? 'warning' : 'info'
 })
 
 function resetForm() {

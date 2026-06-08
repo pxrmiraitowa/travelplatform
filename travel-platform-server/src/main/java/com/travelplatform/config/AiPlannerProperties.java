@@ -15,6 +15,10 @@ public class AiPlannerProperties {
 
     private String model = "gpt-4.1-mini";
 
+    private String chatCompletionsPath = "/chat/completions";
+
+    private boolean useJsonSchemaResponseFormat = true;
+
     private int timeoutSeconds = 20;
 
     private int candidateLimit = 18;
@@ -51,6 +55,22 @@ public class AiPlannerProperties {
 
     public void setModel(String model) {
         this.model = model;
+    }
+
+    public String getChatCompletionsPath() {
+        return chatCompletionsPath;
+    }
+
+    public void setChatCompletionsPath(String chatCompletionsPath) {
+        this.chatCompletionsPath = chatCompletionsPath;
+    }
+
+    public boolean isUseJsonSchemaResponseFormat() {
+        return useJsonSchemaResponseFormat;
+    }
+
+    public void setUseJsonSchemaResponseFormat(boolean useJsonSchemaResponseFormat) {
+        this.useJsonSchemaResponseFormat = useJsonSchemaResponseFormat;
     }
 
     public int getTimeoutSeconds() {

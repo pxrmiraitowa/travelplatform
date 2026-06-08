@@ -48,9 +48,11 @@ travel:
 ai:
   planner:
     enabled: ${AI_PLANNER_ENABLED:true}
-    base-url: ${AI_BASE_URL:https://api.openai.com/v1}
+    base-url: ${AI_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode/v1}
     api-key: ${AI_API_KEY:}
-    model: ${AI_MODEL:gpt-4.1-mini}
+    model: ${AI_MODEL:qwen-plus}
+    chat-completions-path: ${AI_CHAT_COMPLETIONS_PATH:/chat/completions}
+    use-json-schema-response-format: ${AI_USE_JSON_SCHEMA_RESPONSE_FORMAT:false}
     timeout-seconds: ${AI_TIMEOUT_SECONDS:20}
     candidate-limit: ${AI_CANDIDATE_LIMIT:18}
     max-attractions-per-day: ${AI_MAX_ATTRACTIONS_PER_DAY:3}
