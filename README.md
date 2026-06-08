@@ -39,17 +39,13 @@
 
 ### 4.1 推荐：一键启动前后端
 
-项目根目录提供了两套启动脚本：
+项目根目录提供了通用启动脚本：
 
-- 通用启动脚本
-  - `start-dev.ps1`
-  - `start-dev.cmd`
-- 本地 AI 调试脚本
-  - `start-dev-local.ps1`
-  - `start-dev-local.cmd`
+- `start-dev.ps1`
+- `start-dev.cmd`
 
 通用脚本用于普通联调，不携带本地第三方 AI 密钥。  
-本地 AI 调试脚本用于你自己电脑上带环境变量启动后端，脚本文件默认已加入 `.gitignore`，不会进入仓库。
+如果你需要在自己电脑上带环境变量启动第三方 AI，可以基于通用脚本复制一份本地专用脚本，例如 `start-dev-local.ps1`、`start-dev-local.cmd`，并把它们加入 `.gitignore`，避免真实密钥进入仓库。
 
 脚本会自动：
 
@@ -70,13 +66,13 @@ Windows 命令行启动通用版本：
 start-dev.cmd
 ```
 
-PowerShell 启动本地 AI 版本：
+PowerShell 启动本地 AI 本地专用版本：
 
 ```powershell
 .\start-dev-local.ps1
 ```
 
-Windows 命令行启动本地 AI 版本：
+Windows 命令行启动本地 AI 本地专用版本：
 
 ```text
 start-dev-local.cmd
@@ -215,7 +211,7 @@ $env:AI_MODEL="qwen-plus"
 mvn spring-boot:run
 ```
 
-如果你只是本地调试，也可以直接修改 `start-dev-local.ps1` 里的占位值后再运行 `start-dev-local.cmd` 或 `start-dev-local.ps1`。
+如果你只是本地调试，也可以基于 `start-dev.ps1` 复制一份本地专用脚本，填入你自己的环境变量后再运行本地版本。该脚本建议仅保留在本机，并加入 `.gitignore`。
 
 ## 7. 已有功能概览
 
