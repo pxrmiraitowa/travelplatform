@@ -17,7 +17,8 @@ spring:
   sql:
     init:
       mode: always
-      schema-locations: classpath:sql/schema.sql,classpath:sql/ai_trip_plan.sql
+      schema-locations: classpath:sql/schema.sql
+      data-locations: classpath:sql/data-demo.sql
 
 mybatis-plus:
   configuration:

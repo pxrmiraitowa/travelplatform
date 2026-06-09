@@ -31,7 +31,7 @@ class UserProfileIntegrationTest extends AbstractIntegrationTest {
                         .content(toJson(Map.of(
                                 "nickname", "Updated Integration User",
                                 "realName", "Test User",
-                                "phone", "13900000000",
+                                "phone", "13900000001",
                                 "email", "integration@example.com",
                                 "gender", 1,
                                 "avatar", "/uploads/avatar.png"
@@ -39,6 +39,6 @@ class UserProfileIntegrationTest extends AbstractIntegrationTest {
         );
         assertSuccess(updateRoot);
         assertThat(updateRoot.path("data").path("nickname").asText()).isEqualTo("Updated Integration User");
-        assertThat(updateRoot.path("data").path("phone").asText()).isEqualTo("13900000000");
+        assertThat(updateRoot.path("data").path("phone").asText()).isEqualTo("13900000001");
     }
 }
