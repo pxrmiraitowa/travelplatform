@@ -1,0 +1,7 @@
+interface:
+  display_name: "Travel Platform Module Builder"
+  short_description: "为旅游平台课程项目新增业务模块的标准实现流程技能"
+  default_prompt: "Use $travel-platform-module-builder to add or extend a business module in this travel platform project with design-first planning, aligned implementation, and verification."
+
+policy:
+  allow_implicit_invocation: true
