@@ -186,6 +186,12 @@ const contactRules = {
   idCard: [{ required: true, message: '请输入身份证号', trigger: 'blur' }]
 }
 
+profileRules.phone = [{ pattern: /^$|^1\d{10}$/, message: '请输入正确的手机号', trigger: 'blur' }]
+contactRules.phone = [
+  { required: true, message: '请输入联系电话', trigger: 'blur' },
+  { pattern: /^1\d{10}$/, message: '请输入正确的联系电话', trigger: 'blur' }
+]
+
 function syncProfileForm() {
   const userInfo = userStore.userInfo || {}
   profileForm.nickname = userInfo.nickname || ''

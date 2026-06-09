@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '@/router'
+import { useUserStore } from '@/stores/user'
 
 const service = axios.create({
   baseURL: '/api',
@@ -27,8 +28,12 @@ service.interceptors.response.use(
   (error) => {
     const status = error.response?.status
     if (status === 401) {
-      localStorage.removeItem('travel-platform-token')
-      localStorage.removeItem('travel-platform-user')
+      try {
+        useUserStore().clearLogin()
+      } catch (storeError) {
+        localStorage.removeItem('travel-platform-token')
+        localStorage.removeItem('travel-platform-user')
+      }
       ElMessage.error(error.response?.data?.message || '登录已失效，请重新登录')
       const currentPath = router.currentRoute.value?.fullPath || '/'
       const loginPath = currentPath.startsWith('/admin') ? '/admin/login' : '/login'
