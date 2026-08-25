@@ -1,0 +1,15 @@
+target/
+uploads/
+
+.idea/
+.vscode/
+*.iml
+*.log
+
+.git/
+.gitattributes
+.gitignore
+
+.env
+.env.*
+!.env.example
