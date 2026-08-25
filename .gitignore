@@ -4,5 +4,8 @@
 */node_modules/
 */dist/
 *.log
+.env
+.env.*
+!.env.example
 start-dev-local.ps1
 start-dev-local.cmd

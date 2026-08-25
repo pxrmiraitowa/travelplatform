@@ -1,0 +1,74 @@
+name: ${COMPOSE_PROJECT_NAME:-travel-platform}
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-travel_platform}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-travel-platform-local-db-password}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+      # MySQL executes these files once, in lexical order, for a new data volume.
+      - ./travel-platform-server/src/main/resources/sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./travel-platform-server/src/main/resources/sql/data-demo.sql:/docker-entrypoint-initdb.d/02-demo-data.sql:ro
+      - ./travel-platform-server/scripts/demo-data-patch-20260601.sql:/docker-entrypoint-initdb.d/03-demo-data-migration-20260601.sql:ro
+      # Test data is available on demand and is not part of normal initialization.
+      - ./travel-platform-server/src/test/resources/sql/data-test.sql:/opt/travel-platform/sql/data-test.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - travel-network
+
+  backend:
+    image: travel-platform-server:${IMAGE_TAG:-0.1.0}
+    build:
+      context: ./travel-platform-server
+      dockerfile: Dockerfile
+    environment:
+      DB_URL: "jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-travel_platform}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false"
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-travel-platform-local-db-password}
+      JWT_SECRET: ${JWT_SECRET:-travel-platform-local-jwt-secret-change-before-deploy-2026}
+      SQL_INIT_MODE: never
+      UPLOAD_DIR: /app/uploads
+      AI_PLANNER_ENABLED: ${AI_PLANNER_ENABLED:-false}
+      TZ: Asia/Shanghai
+    volumes:
+      - backend_uploads:/app/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - travel-network
+
+  frontend:
+    image: travel-platform-web:${IMAGE_TAG:-0.1.0}
+    build:
+      context: ./travel-platform-web
+      dockerfile: Dockerfile
+    ports:
+      - "${FRONTEND_PORT:-8088}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - travel-network
+
+volumes:
+  mysql_data:
+  backend_uploads:
+
+networks:
+  travel-network:
+    driver: bridge

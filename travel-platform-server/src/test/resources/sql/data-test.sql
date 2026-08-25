@@ -11,7 +11,7 @@ SELECT 'demo_user', '$2a$10$ujhAXWqWhkHyzQIC5ywpjuBNnShqqvIj4b3hWe3BShQHWvJyrfPv
 WHERE NOT EXISTS (SELECT 1 FROM `user` WHERE `username` = 'demo_user');
 
 INSERT INTO `user` (`username`, `password`, `nickname`, `phone`, `status`)
-SELECT 'admin', '$2a$10$RwUGSDk/j9fnReTZnKYcdO8vn0yZyL0z5pQ0a6GnsHVKu/9xCxV/.', '系统管理员', '13900000001', 1
+SELECT 'admin', '$2a$10$RwUGSDk/j9fnReTZnKYcdO8vn0yZyL0z5pQ0a6GnsHVKu/9xCxV/.', '系统管理员', '13900000009', 1
 WHERE NOT EXISTS (SELECT 1 FROM `user` WHERE `username` = 'admin');
 
 INSERT INTO `user_role` (`user_id`, `role_id`)

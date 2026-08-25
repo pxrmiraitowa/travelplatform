@@ -30,14 +30,100 @@
 
 ## 3. 运行环境
 
-- JDK 17
-- Maven 3.9+
-- MySQL 8.x
-- Node.js 18+
+- 推荐容器方式：Docker Desktop，或 Docker Engine + Docker Compose v2
+- 本地源码方式：JDK 17、Maven 3.9+、MySQL 8.x、Node.js 22
 
 ## 4. 快速启动
 
-### 4.1 推荐：一键启动前后端
+### 4.1 推荐：Docker Compose 启动完整系统
+
+换一台机器后，只需要安装 Docker 并取得本仓库代码，不需要单独安装 Java、Maven、Node.js 或 MySQL。
+
+首次启动时，在项目根目录复制环境变量示例文件：
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Linux 或 macOS：
+
+```bash
+cp .env.example .env
+```
+
+`.env` 中的值只用于本地演示。共享部署前必须修改 `MYSQL_ROOT_PASSWORD` 和 `JWT_SECRET`，不要提交 `.env`。
+
+构建并启动 MySQL、后端和前端：
+
+```powershell
+docker compose up -d --build
+```
+
+首次构建需要联网下载基础镜像和依赖。启动完成后检查状态：
+
+```powershell
+docker compose ps
+```
+
+三个服务都应显示 `healthy`。继续验证前端和完整 API 代理链路：
+
+```powershell
+curl.exe --fail http://localhost:8088/healthz
+curl.exe --fail http://localhost:8088/api/public/health
+```
+
+Linux 或 macOS 将 `curl.exe` 改为 `curl`。预期分别返回 `ok`，以及包含 `"code":200`、`"status":"UP"` 的 JSON。
+
+启动成功后访问：
+
+- 前端首页：[http://localhost:8088](http://localhost:8088)
+- 后端健康接口：[http://localhost:8088/api/public/health](http://localhost:8088/api/public/health)
+- Swagger：[http://localhost:8088/swagger-ui.html](http://localhost:8088/swagger-ui.html)
+
+Compose 使用三个独立容器：
+
+- `mysql`：官方 `mysql:8.4` 镜像
+- `backend`：项目后端 Dockerfile 构建的版本化镜像
+- `frontend`：项目前端 Dockerfile 构建的版本化镜像，并由 Nginx 提供静态文件和 `/api` 代理
+
+应用镜像版本由 `.env` 中的 `IMAGE_TAG` 控制，默认是 `0.1.0`，不会只使用 `latest`。
+
+数据库在空数据卷中按以下顺序自动初始化：
+
+1. `schema.sql`：建表
+2. `data-demo.sql`：演示数据
+3. `demo-data-patch-20260601.sql`：数据迁移补丁
+
+测试数据脚本不会在普通演示环境自动执行。脚本路径、手动导入方法和迁移规则见 [`deploy/db/README.md`](deploy/db/README.md)。
+
+查看日志：
+
+```powershell
+docker compose logs --tail 200 mysql
+docker compose logs --tail 200 backend
+docker compose logs --tail 200 frontend
+```
+
+停止系统但保留数据库和上传文件：
+
+```powershell
+docker compose down
+```
+
+再次启动：
+
+```powershell
+docker compose up -d
+```
+
+如需从空数据库重新验证初始化，可执行下面的命令。注意，该命令会永久删除当前 Compose 数据库数据和上传文件：
+
+```powershell
+docker compose down -v
+docker compose up -d --build
+```
+
+### 4.2 本地源码方式：一键启动前后端
 
 项目根目录提供了通用启动脚本：
 
@@ -84,7 +170,7 @@ start-dev-local.cmd
 - 后端接口：[http://localhost:8080](http://localhost:8080)
 - Swagger：[http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
 
-### 4.2 单独启动后端
+### 4.3 单独启动后端
 
 后端目录：
 
@@ -113,13 +199,14 @@ mvn clean compile spring-boot:run
 
 - 端口：`8080`
 - 数据库：`travel_platform`
-- 用户名：`root`
-- 密码：`123456`
+- 数据库连接：通过 `DB_URL`、`DB_USERNAME`、`DB_PASSWORD` 覆盖
+- JWT 密钥：通过 `JWT_SECRET` 覆盖
+- 上传目录：通过 `UPLOAD_DIR` 覆盖
 
 说明：
 
-- 项目启动时会自动执行 `schema.sql` 和 `ai_trip_plan.sql`
-- 会自动建表并补充默认演示数据
+- 本地源码方式默认由 Spring Boot 执行 `schema.sql` 和 `data-demo.sql`
+- Docker Compose 方式由 MySQL 官方镜像执行编号化初始化脚本，后端设置 `SQL_INIT_MODE=never`，避免重复初始化
 - 景点初始化采用幂等方式，不会因重启自动清空 `attraction` 表
 - 本地上传图片默认保存在后端目录下的 `uploads/`
 
@@ -131,7 +218,7 @@ mvn package "-DskipTests"
 java -jar target\travel-platform-server-0.0.1-SNAPSHOT.jar
 ```
 
-### 4.3 单独启动前端
+### 4.4 单独启动前端
 
 前端目录：
 
@@ -143,7 +230,7 @@ travel-platform-web
 
 ```bash
 cd travel-platform-web
-npm install
+npm ci
 npm run dev
 ```
 
@@ -403,4 +490,5 @@ Swagger：
 - 本地上传图片保存到后端 `uploads/` 目录
 - `travel-platform-server/uploads/` 已加入 `.gitignore`
 - 如需启用第三方 AI，务必通过环境变量或本地忽略脚本提供真实密钥，不要把密钥写回仓库
-- 如修改数据库连接信息，需要同步更新 `application.yml`
+- Docker Compose 的本地配置放在不提交的 `.env` 中；仓库只提交 `.env.example`
+- 如修改数据库连接信息，应优先修改环境变量，不要把真实密码写回 `application.yml`
