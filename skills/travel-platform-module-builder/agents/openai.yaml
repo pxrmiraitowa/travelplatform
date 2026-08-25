@@ -1,6 +1,6 @@
 interface:
   display_name: "Travel Platform Module Builder"
-  short_description: "ÎªÂÃÓÎÆ½Ì¨¿Î³ÌÏîÄ¿ĞÂÔöÒµÎñÄ£¿éµÄ±ê×¼ÊµÏÖÁ÷³Ì¼¼ÄÜ"
+  short_description: "ä¸ºæ—…æ¸¸å¹³å°è¯¾ç¨‹é¡¹ç›®æ–°å¢ä¸šåŠ¡æ¨¡å—çš„æ ‡å‡†å®ç°æµç¨‹æŠ€èƒ½"
   default_prompt: "Use $travel-platform-module-builder to add or extend a business module in this travel platform project with design-first planning, aligned implementation, and verification."
 
 policy:
