@@ -99,6 +99,16 @@ cd travel-platform-server
 mvn spring-boot:run
 ```
 
+如果你的路径里有中文，Spring Boot 3.3.0～3.3.5 会错误处理该路径，导致启动类明明已编译，却报 ClassNotFoundException。官方确认该问题在 3.3.6 修复。你需要：
+把 pom.xml 中：
+    <version>3.3.5</version>
+改成：
+    <version>3.3.6</version>
+然后运行：
+```bash
+mvn clean compile spring-boot:run
+```
+
 默认配置来自 `travel-platform-server/src/main/resources/application.yml`：
 
 - 端口：`8080`
