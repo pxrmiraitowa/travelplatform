@@ -4,9 +4,21 @@ server:
 spring:
   application:
     name: product-service
+  datasource:
+    url: jdbc:mysql://localhost:3306/travel_product?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
 
 service:
   version: 0.0.1-SNAPSHOT
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
 
 springdoc:
   api-docs:
