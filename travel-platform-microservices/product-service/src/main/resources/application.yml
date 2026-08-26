@@ -1,0 +1,15 @@
+server:
+  port: 8102
+
+spring:
+  application:
+    name: product-service
+
+service:
+  version: 0.0.1-SNAPSHOT
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html

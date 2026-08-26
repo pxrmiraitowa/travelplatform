@@ -1,8 +1,11 @@
 .idea/
 */.idea/
 */target/
+**/target/
 */node_modules/
+**/node_modules/
 */dist/
+**/dist/
 *.log
 start-dev-local.ps1
 start-dev-local.cmd
