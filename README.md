@@ -93,6 +93,7 @@ Compose 使用三个独立容器：
 1. `schema.sql`：建表
 2. `data-demo.sql`：演示数据
 3. `demo-data-patch-20260601.sql`：数据迁移补丁
+4. `demo-data-charset-repair-20260826.sql`：修复旧数据卷中的中文编码并保持幂等
 
 测试数据脚本不会在普通演示环境自动执行。脚本路径、手动导入方法和迁移规则见 [`deploy/db/README.md`](deploy/db/README.md)。
 
@@ -123,7 +124,82 @@ docker compose down -v
 docker compose up -d --build
 ```
 
-### 4.2 本地源码方式：一键启动前后端
+### 4.2 GitHub Actions + GHCR + Kind 自动流水线
+
+仓库提供 [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml)。向 GitHub 仓库的 `dev` 分支 push 后，流水线会在同一个串行作业中依次执行：
+
+1. 取代码
+2. 安装 Maven 和 npm 依赖
+3. 编译后端和前端
+4. 执行后端、前端单元测试
+5. 使用 MySQL 8.4 执行后端集成测试
+6. 制作前后端镜像并推送到 GHCR
+7. 创建 Kind 集群并部署 MySQL、后端和前端
+8. 检查 Kubernetes 工作负载、前端 `/healthz` 和后端 `/api/public/health`
+
+这些步骤没有设置忽略失败。任意一步返回非零状态后，后面的构建或部署步骤都会被跳过。诊断和上传步骤使用 `if: always()`，因此无论成功还是失败，GitHub Actions 页面都有完整日志，并会保留 30 天的 `ci-cd-evidence-运行ID` 构件。
+
+前后端镜像会同时生成两种版本标签：
+
+- `sha-提交哈希前12位`：Kubernetes 实际部署的不可变提交版本
+- `0.1.流水线序号`：便于课程演示和人工识别的发布版本
+
+流水线不会制作或部署 `latest` 标签。镜像名称为：
+
+```text
+ghcr.io/<GitHub用户名或组织名>/travel-platform-server:<版本>
+ghcr.io/<GitHub用户名或组织名>/travel-platform-web:<版本>
+```
+
+当前 `origin` 是 CodeArts 地址，必须先在 GitHub 创建一个空仓库，并把本项目的 `dev` 分支推送过去。保留 CodeArts 作为 `origin` 时，可以增加第二个远程地址：
+
+```powershell
+git remote add github https://github.com/<你的GitHub用户名>/travelplatform.git
+git push -u github dev
+```
+
+第二条命令就是首次触发流水线的 push。以后使用 `git push github dev` 即可再次触发。如果 GitHub 仓库或组织限制了 `GITHUB_TOKEN`，需要在仓库 `Settings -> Actions -> General -> Workflow permissions` 中允许读写；正常情况下不需要另外创建 GHCR 密码，工作流使用当前运行的 `GITHUB_TOKEN` 发布镜像。
+
+流水线相关文件：
+
+- `.github/workflows/ci-cd.yml`：流水线配置
+- `deploy/kind/cluster.yaml`：Kind 集群与宿主机端口映射
+- `deploy/k8s/*.yaml`：MySQL、后端和前端 Kubernetes 清单
+- `scripts/deploy-kind.sh`：创建 Secret、挂载数据库脚本并部署工作负载
+- `scripts/health-check.sh`：部署后健康检查
+- `scripts/collect-k8s-logs.sh`：成功或失败时收集集群诊断记录
+
+Kubernetes 中的 `mysql:8.4-kind-amd64` 是流水线对官方 `mysql:8.4` amd64 精确摘要添加的 Kind 本地标签，镜像内容没有修改，也没有数据库 Dockerfile。这样可以避免多架构清单和 Kind 节点代理差异导致重复拉取。
+
+本机具备 Docker、Kind、kubectl 和 Git Bash 时，也可以先用本地镜像验证 Kubernetes 部署：
+
+```powershell
+$tag = "0.1.0-kind"
+docker build -t "travel-platform-server:$tag" .\travel-platform-server
+docker build -t "travel-platform-web:$tag" .\travel-platform-web
+kind create cluster --name travel-platform-ci --config .\deploy\kind\cluster.yaml --wait 180s
+$mysqlSource = "mysql:8.4@sha256:1d6b6a8fcee8ff758ff151d017f5203cd06792a0e698f0a593c9dfcb14609cf0"
+docker pull $mysqlSource
+docker tag $mysqlSource mysql:8.4-kind-amd64
+kind load docker-image mysql:8.4-kind-amd64 --name travel-platform-ci
+kind load docker-image "travel-platform-server:$tag" --name travel-platform-ci
+kind load docker-image "travel-platform-web:$tag" --name travel-platform-ci
+$env:BACKEND_IMAGE = "travel-platform-server"
+$env:FRONTEND_IMAGE = "travel-platform-web"
+$env:IMAGE_TAG = $tag
+$env:MYSQL_ROOT_PASSWORD = "只用于本次验证的数据库密码"
+$env:JWT_SECRET = "只用于本次验证且长度足够的JWT密钥-2026"
+bash .\scripts\deploy-kind.sh
+bash .\scripts\health-check.sh
+```
+
+健康检查通过后，在浏览器访问 [http://localhost:18080](http://localhost:18080)。验证结束可删除临时集群：
+
+```powershell
+kind delete cluster --name travel-platform-ci
+```
+
+### 4.3 本地源码方式：一键启动前后端
 
 项目根目录提供了通用启动脚本：
 
@@ -170,7 +246,7 @@ start-dev-local.cmd
 - 后端接口：[http://localhost:8080](http://localhost:8080)
 - Swagger：[http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
 
-### 4.3 单独启动后端
+### 4.4 单独启动后端
 
 后端目录：
 
@@ -218,7 +294,7 @@ mvn package "-DskipTests"
 java -jar target\travel-platform-server-0.0.1-SNAPSHOT.jar
 ```
 
-### 4.4 单独启动前端
+### 4.5 单独启动前端
 
 前端目录：
 

@@ -1,3 +1,6 @@
+-- Keep SQL literals in UTF-8 even when the MySQL command-line client defaults to latin1.
+SET NAMES utf8mb4;
+
 CREATE TABLE IF NOT EXISTS `role` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,
     `role_code` VARCHAR(50) NOT NULL,

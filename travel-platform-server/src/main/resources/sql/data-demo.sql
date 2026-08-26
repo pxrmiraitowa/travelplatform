@@ -1,3 +1,7 @@
+-- The official MySQL image may invoke its client with latin1 as the session default.
+-- Declare the file encoding explicitly before inserting Chinese demo text.
+SET NAMES utf8mb4;
+
 INSERT INTO `role` (`role_code`, `role_name`, `status`)
 SELECT 'ROLE_USER', '普通用户', 1
 WHERE NOT EXISTS (SELECT 1 FROM `role` WHERE `role_code` = 'ROLE_USER');

@@ -1,3 +1,6 @@
+-- Keep test fixtures consistent across local MySQL and containerized MySQL clients.
+SET NAMES utf8mb4;
+
 INSERT INTO `role` (`role_code`, `role_name`, `status`)
 VALUES
 ('ROLE_USER', '普通用户', 1),

@@ -7,6 +7,7 @@
 | 01 | 建表 | `travel-platform-server/src/main/resources/sql/schema.sql` | `/docker-entrypoint-initdb.d/01-schema.sql` |
 | 02 | 演示数据 | `travel-platform-server/src/main/resources/sql/data-demo.sql` | `/docker-entrypoint-initdb.d/02-demo-data.sql` |
 | 03 | 演示数据迁移 | `travel-platform-server/scripts/demo-data-patch-20260601.sql` | `/docker-entrypoint-initdb.d/03-demo-data-migration-20260601.sql` |
+| 04 | 演示数据字符集修复 | `travel-platform-server/scripts/demo-data-charset-repair-20260826.sql` | `/docker-entrypoint-initdb.d/04-demo-data-charset-repair-20260826.sql` |
 | 手动 | 集成测试数据 | `travel-platform-server/src/test/resources/sql/data-test.sql` | `/opt/travel-platform/sql/data-test.sql` |
 
 MySQL 官方镜像只会在数据目录为空时自动执行 `/docker-entrypoint-initdb.d`。因此，修改初始化脚本后需要在确认不再需要旧数据的前提下删除 Compose 数据卷，再重新启动：
@@ -28,6 +29,12 @@ docker compose exec mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_D
 
 ```powershell
 docker compose exec mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE" < /docker-entrypoint-initdb.d/03-demo-data-migration-20260601.sql'
+```
+
+字符集修复迁移也可以安全地重复执行，用于修复已经存在的数据卷：
+
+```bash
+docker compose exec mysql sh -c 'mysql --default-character-set=utf8mb4 -uroot -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE" < /docker-entrypoint-initdb.d/04-demo-data-charset-repair-20260826.sql'
 ```
 
 所有初始化与测试数据语句应保持幂等，确保重复执行不会产生重复数据或破坏已有业务记录。

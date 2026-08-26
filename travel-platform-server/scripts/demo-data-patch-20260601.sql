@@ -1,3 +1,6 @@
+-- Ensure Chinese migration literals are decoded as UTF-8 by the MySQL client.
+SET NAMES utf8mb4;
+
 UPDATE `flight`
 SET
     `airline_name` = '上海航空',

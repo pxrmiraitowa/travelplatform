@@ -16,6 +16,7 @@ services:
       - ./travel-platform-server/src/main/resources/sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
       - ./travel-platform-server/src/main/resources/sql/data-demo.sql:/docker-entrypoint-initdb.d/02-demo-data.sql:ro
       - ./travel-platform-server/scripts/demo-data-patch-20260601.sql:/docker-entrypoint-initdb.d/03-demo-data-migration-20260601.sql:ro
+      - ./travel-platform-server/scripts/demo-data-charset-repair-20260826.sql:/docker-entrypoint-initdb.d/04-demo-data-charset-repair-20260826.sql:ro
       # Test data is available on demand and is not part of normal initialization.
       - ./travel-platform-server/src/test/resources/sql/data-test.sql:/opt/travel-platform/sql/data-test.sql:ro
     healthcheck:
