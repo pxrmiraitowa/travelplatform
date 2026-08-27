@@ -1,6 +1,6 @@
 <template>
   <div class="booking-page" v-loading="loading">
-    <SectionCard title="机票下单" description="选择联系人和可用优惠券后提交订单，后端会再次校验优惠券门槛。">
+    <SectionCard title="机票下单" description="选择联系人后提交订单，订单金额以服务端商品快照为准。">
       <div v-if="flight" class="booking-layout">
         <div class="flight-summary">
           <div class="summary-title">{{ flight.departureCity }} -> {{ flight.arrivalCity }}</div>
@@ -16,26 +16,13 @@
             </el-select>
           </el-form-item>
 
-          <el-form-item label="优惠券">
-            <el-select v-model="form.couponId" clearable placeholder="不使用优惠券">
-              <el-option v-for="item in eligibleCoupons" :key="item.id" :label="couponLabel(item)" :value="item.id" />
-            </el-select>
-            <div class="coupon-tip">
-              <span v-if="eligibleCoupons.length">已自动选择当前最优优惠券。</span>
-              <span v-else-if="coupons.length">当前订单金额未达到优惠券门槛。</span>
-              <span v-else>当前没有可用规则优惠券。</span>
-            </div>
-          </el-form-item>
-
           <el-form-item label="备注">
             <el-input v-model="form.remark" type="textarea" :rows="3" maxlength="255" show-word-limit placeholder="可填写出行备注" />
           </el-form-item>
 
           <div class="price-board">
             <div>票面价：￥{{ formatPrice(originalAmount) }}</div>
-            <div>优惠金额：-￥{{ formatPrice(discountAmount) }}</div>
-            <div v-if="selectedCoupon" class="coupon-name">已使用：{{ selectedCoupon.couponName }}</div>
-            <div class="summary-price">应付金额：￥{{ formatPrice(payableAmount) }}</div>
+            <div class="summary-price">订单金额：￥{{ formatPrice(originalAmount) }}</div>
           </div>
 
           <div v-if="!contacts.length" class="contact-tip">
@@ -53,14 +40,13 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import SectionCard from '@/components/SectionCard.vue'
 import { getFlightDetail } from '@/api/flight'
 import { createFlightOrder } from '@/api/order'
-import { getFlightPriceCompare } from '@/api/price'
 import { getUserContacts } from '@/api/userContact'
 
 const route = useRoute()
@@ -70,11 +56,9 @@ const loading = ref(false)
 const submitting = ref(false)
 const flight = ref(null)
 const contacts = ref([])
-const coupons = ref([])
 
 const form = reactive({
   contactId: null,
-  couponId: null,
   remark: ''
 })
 
@@ -83,36 +67,16 @@ const rules = {
 }
 
 const originalAmount = computed(() => Number(flight.value?.price || 0))
-const eligibleCoupons = computed(() =>
-  coupons.value
-    .filter((item) => originalAmount.value >= Number(item.thresholdAmount || 0))
-    .sort((a, b) => Number(b.discountAmount || 0) - Number(a.discountAmount || 0))
-)
-const selectedCoupon = computed(() => eligibleCoupons.value.find((item) => item.id === form.couponId) || null)
-const discountAmount = computed(() => Number(selectedCoupon.value?.discountAmount || 0))
-const payableAmount = computed(() => Math.max(originalAmount.value - discountAmount.value, 0))
-
-watch(eligibleCoupons, (list) => {
-  if (!list.length) {
-    form.couponId = null
-    return
-  }
-  if (!form.couponId || !list.some((item) => item.id === form.couponId)) {
-    form.couponId = list[0].id
-  }
-}, { immediate: true })
 
 async function loadData() {
   loading.value = true
   try {
-    const [flightResponse, contactResponse, compareResponse] = await Promise.all([
+    const [flightResponse, contactResponse] = await Promise.all([
       getFlightDetail(route.params.id),
-      getUserContacts(),
-      getFlightPriceCompare(route.params.id)
+      getUserContacts()
     ])
     flight.value = flightResponse.data
     contacts.value = contactResponse.data
-    coupons.value = compareResponse.data.couponList || []
     const defaultContact = contacts.value.find((item) => item.isDefault === 1) || contacts.value[0]
     form.contactId = defaultContact?.id ?? null
   } finally {
@@ -142,10 +106,6 @@ async function submitOrder() {
   } finally {
     submitting.value = false
   }
-}
-
-function couponLabel(item) {
-  return `${item.couponName}（满￥${formatPrice(item.thresholdAmount)}减￥${formatPrice(item.discountAmount)}）`
 }
 
 function formatDateTime(value) {
@@ -197,12 +157,6 @@ onMounted(() => {
   width: 100%;
 }
 
-.coupon-tip {
-  margin-top: 8px;
-  color: #64748b;
-  font-size: 13px;
-}
-
 .price-board {
   margin-bottom: 16px;
   padding: 16px;
@@ -211,10 +165,6 @@ onMounted(() => {
   color: #7c2d12;
   display: grid;
   gap: 6px;
-}
-
-.coupon-name {
-  color: #c2410c;
 }
 
 .contact-tip {

@@ -25,7 +25,7 @@ export function logout() {
 
 export function adminLogin(data) {
   return request({
-    url: '/admin/auth/login',
+    url: '/auth/login',
     method: 'post',
     data
   })
@@ -33,7 +33,7 @@ export function adminLogin(data) {
 
 export function getCurrentAdmin() {
   return request({
-    url: '/admin/auth/me',
+    url: '/users/me',
     method: 'get'
   })
 }
