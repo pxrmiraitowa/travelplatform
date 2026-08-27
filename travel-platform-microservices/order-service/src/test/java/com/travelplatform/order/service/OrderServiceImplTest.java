@@ -11,6 +11,7 @@ import com.travelplatform.common.exception.BusinessException;
 import com.travelplatform.order.dto.OrderCreateRequest;
 import com.travelplatform.order.dto.OrderRefundRequest;
 import com.travelplatform.order.entity.Order;
+import com.travelplatform.order.integration.CouponSettlement;
 import com.travelplatform.order.integration.ProductSnapshot;
 import com.travelplatform.order.integration.ProductSnapshotClient;
 import com.travelplatform.order.mapper.OrderMapper;
@@ -39,6 +40,9 @@ class OrderServiceImplTest {
         OrderCreateRequest request = request();
         when(productClient.getSnapshot(request)).thenReturn(new ProductSnapshot(8L, "测试航班", "广州 → 上海",
                 new BigDecimal("680.00"), true, 5));
+        when(productClient.settleCoupon("FLIGHT", null, new BigDecimal("1360.00")))
+                .thenReturn(new CouponSettlement(null, null, new BigDecimal("1360.00"),
+                        BigDecimal.ZERO, new BigDecimal("1360.00"), false));
 
         service.create(3L, request);
 
@@ -46,8 +50,31 @@ class OrderServiceImplTest {
         verify(orderMapper).insert(captor.capture());
         Order saved = captor.getValue();
         assertEquals(new BigDecimal("1360.00"), saved.getTotalAmount());
+        assertEquals(BigDecimal.ZERO, saved.getDiscountAmount());
         assertEquals(OrderStatusConstant.PENDING_PAYMENT, saved.getOrderStatus());
         assertEquals(3L, saved.getUserId());
+    }
+
+    @Test
+    void createsOrderWithOptionalCouponSettlement() {
+        OrderCreateRequest request = request();
+        request.setCouponId(31L);
+        when(productClient.getSnapshot(request)).thenReturn(new ProductSnapshot(8L, "测试航班", "广州 → 上海",
+                new BigDecimal("680.00"), true, 5));
+        when(productClient.settleCoupon("FLIGHT", 31L, new BigDecimal("1360.00")))
+                .thenReturn(new CouponSettlement(31L, "Flight Coupon", new BigDecimal("1360.00"),
+                        new BigDecimal("50.00"), new BigDecimal("1310.00"), true));
+
+        service.create(3L, request);
+
+        ArgumentCaptor<Order> captor = ArgumentCaptor.forClass(Order.class);
+        verify(orderMapper).insert(captor.capture());
+        Order saved = captor.getValue();
+        assertEquals(new BigDecimal("1360.00"), saved.getOriginalAmount());
+        assertEquals(new BigDecimal("50.00"), saved.getDiscountAmount());
+        assertEquals(new BigDecimal("1310.00"), saved.getTotalAmount());
+        assertEquals(31L, saved.getCouponId());
+        assertEquals("Flight Coupon", saved.getCouponName());
     }
 
     @Test

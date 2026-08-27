@@ -14,7 +14,11 @@ public class OrderVO {
     private String productSummary;
     private BigDecimal unitPrice;
     private Integer quantity;
+    private BigDecimal originalAmount;
+    private BigDecimal discountAmount;
     private BigDecimal totalAmount;
+    private Long couponId;
+    private String couponName;
     private Integer orderStatus;
     private LocalDate travelDate;
     private String contactName;
@@ -29,7 +33,9 @@ public class OrderVO {
         vo.id = order.getId(); vo.orderNo = order.getOrderNo(); vo.productType = order.getBizType();
         vo.productId = order.getBizId(); vo.productName = order.getProductName();
         vo.productSummary = order.getProductSummary(); vo.unitPrice = order.getUnitPrice();
-        vo.quantity = order.getQuantity(); vo.totalAmount = order.getTotalAmount();
+        vo.quantity = order.getQuantity(); vo.originalAmount = order.getOriginalAmount();
+        vo.discountAmount = order.getDiscountAmount(); vo.totalAmount = order.getTotalAmount();
+        vo.couponId = order.getCouponId(); vo.couponName = order.getCouponName();
         vo.orderStatus = order.getOrderStatus(); vo.travelDate = order.getTravelDate();
         vo.contactName = order.getContactName(); vo.contactPhone = order.getContactPhone();
         vo.paidAt = order.getPaidAt(); vo.createdAt = order.getCreatedAt();
@@ -48,8 +54,10 @@ public class OrderVO {
     public BigDecimal getUnitPrice() { return unitPrice; }
     public Integer getQuantity() { return quantity; }
     public BigDecimal getTotalAmount() { return totalAmount; }
-    public BigDecimal getOriginalAmount() { return totalAmount; }
-    public BigDecimal getDiscountAmount() { return BigDecimal.ZERO; }
+    public BigDecimal getOriginalAmount() { return originalAmount; }
+    public BigDecimal getDiscountAmount() { return discountAmount; }
+    public Long getCouponId() { return couponId; }
+    public String getCouponName() { return couponName; }
     public Integer getOrderStatus() { return orderStatus; }
     public LocalDate getTravelDate() { return travelDate; }
     public String getContactName() { return contactName; }

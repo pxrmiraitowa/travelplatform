@@ -20,13 +20,27 @@
             </el-select>
           </el-form-item>
 
+          <el-form-item label="优惠券">
+            <el-select v-model="form.couponId" clearable placeholder="不使用优惠券">
+              <el-option
+                v-for="item in availableCoupons"
+                :key="item.id"
+                :label="couponLabel(item)"
+                :value="item.id"
+                :disabled="!canUseCoupon(item)"
+              />
+            </el-select>
+          </el-form-item>
+
           <el-form-item label="备注">
             <el-input v-model="form.remark" type="textarea" :rows="3" maxlength="255" show-word-limit placeholder="可填写出行备注" />
           </el-form-item>
 
           <div class="price-board">
             <div>产品原价：￥{{ formatPrice(originalAmount) }}</div>
-            <div class="total-line">订单金额：￥{{ formatPrice(originalAmount) }}</div>
+            <div>优惠金额：-￥{{ formatPrice(discountAmount) }}</div>
+            <div class="total-line">预计订单金额：￥{{ formatPrice(payableAmount) }}</div>
+            <div class="price-tip">最终金额以后端订单结算结果为准。</div>
           </div>
 
           <div class="form-actions">
@@ -45,6 +59,7 @@ import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import SectionCard from '@/components/SectionCard.vue'
 import { createTourOrder } from '@/api/order'
+import { getTourPriceCompare } from '@/api/price'
 import { getTourDetail } from '@/api/tour'
 import { getUserContacts } from '@/api/userContact'
 
@@ -55,10 +70,12 @@ const loading = ref(false)
 const submitting = ref(false)
 const tour = ref(null)
 const contacts = ref([])
+const coupons = ref([])
 
 const form = reactive({
   travelDate: '',
   contactId: null,
+  couponId: null,
   remark: ''
 })
 
@@ -68,16 +85,28 @@ const rules = {
 }
 
 const originalAmount = computed(() => Number(tour.value?.price || 0))
+const availableCoupons = computed(() => coupons.value || [])
+const selectedCoupon = computed(() => availableCoupons.value.find((item) => item.id === form.couponId) || null)
+const discountAmount = computed(() => {
+  const coupon = selectedCoupon.value
+  if (!coupon || !canUseCoupon(coupon)) {
+    return 0
+  }
+  return Math.min(Number(coupon.discountAmount || 0), originalAmount.value)
+})
+const payableAmount = computed(() => Math.max(originalAmount.value - discountAmount.value, 0))
 
 async function loadData() {
   loading.value = true
   try {
-    const [tourResponse, contactResponse] = await Promise.all([
+    const [tourResponse, contactResponse, compareResponse] = await Promise.all([
       getTourDetail(route.params.id),
-      getUserContacts()
+      getUserContacts(),
+      getTourPriceCompare(route.params.id)
     ])
     tour.value = tourResponse.data
     contacts.value = contactResponse.data
+    coupons.value = compareResponse.data?.couponList || []
     const queryDate = route.query.travelDate || ''
     form.travelDate = tour.value.travelDateOptions?.includes(queryDate) ? queryDate : (tour.value.travelDateOptions?.[0] || '')
     const defaultContact = contacts.value.find((item) => item.isDefault === 1) || contacts.value[0]
@@ -99,6 +128,7 @@ async function submitOrder() {
       productType: 'TOUR',
       productId: Number(route.params.id),
       quantity: 1,
+      couponId: form.couponId || null,
       travelDate: form.travelDate,
       contactName: contact?.name,
       contactPhone: contact?.phone
@@ -112,6 +142,17 @@ async function submitOrder() {
 
 function formatPrice(value) {
   return Number(value || 0).toFixed(2)
+}
+
+function canUseCoupon(coupon) {
+  return originalAmount.value >= Number(coupon.thresholdAmount || 0)
+}
+
+function couponLabel(coupon) {
+  const threshold = Number(coupon.thresholdAmount || 0)
+  const discount = Number(coupon.discountAmount || 0)
+  const suffix = canUseCoupon(coupon) ? '' : '（未达门槛）'
+  return `${coupon.couponName}：满￥${formatPrice(threshold)} 减￥${formatPrice(discount)}${suffix}`
 }
 
 onMounted(() => {
@@ -169,6 +210,11 @@ onMounted(() => {
   color: #d9480f;
   font-size: 20px;
   font-weight: 700;
+}
+
+.price-tip {
+  color: #166534;
+  font-size: 13px;
 }
 
 .form-actions {

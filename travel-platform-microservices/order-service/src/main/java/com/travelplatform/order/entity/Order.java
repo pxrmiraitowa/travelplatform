@@ -21,7 +21,10 @@ public class Order {
     private BigDecimal unitPrice;
     private Integer quantity;
     private BigDecimal originalAmount;
+    private BigDecimal discountAmount;
     private BigDecimal totalAmount;
+    private Long couponId;
+    private String couponName;
     private Integer orderStatus;
     private LocalDate travelDate;
     private String contactName;
@@ -54,8 +57,14 @@ public class Order {
     public void setQuantity(Integer quantity) { this.quantity = quantity; }
     public BigDecimal getOriginalAmount() { return originalAmount; }
     public void setOriginalAmount(BigDecimal originalAmount) { this.originalAmount = originalAmount; }
+    public BigDecimal getDiscountAmount() { return discountAmount; }
+    public void setDiscountAmount(BigDecimal discountAmount) { this.discountAmount = discountAmount; }
     public BigDecimal getTotalAmount() { return totalAmount; }
     public void setTotalAmount(BigDecimal totalAmount) { this.totalAmount = totalAmount; }
+    public Long getCouponId() { return couponId; }
+    public void setCouponId(Long couponId) { this.couponId = couponId; }
+    public String getCouponName() { return couponName; }
+    public void setCouponName(String couponName) { this.couponName = couponName; }
     public Integer getOrderStatus() { return orderStatus; }
     public void setOrderStatus(Integer orderStatus) { this.orderStatus = orderStatus; }
     public LocalDate getTravelDate() { return travelDate; }

@@ -12,6 +12,7 @@ public class OrderCreateRequest {
     @Min(1) @Max(99) private Integer quantity = 1;
     private Long variantId;
     private String variantName;
+    private Long couponId;
     @NotNull private LocalDate travelDate;
     @NotBlank private String contactName;
     @NotBlank private String contactPhone;
@@ -26,6 +27,8 @@ public class OrderCreateRequest {
     public void setVariantId(Long variantId) { this.variantId = variantId; }
     public String getVariantName() { return variantName; }
     public void setVariantName(String variantName) { this.variantName = variantName; }
+    public Long getCouponId() { return couponId; }
+    public void setCouponId(Long couponId) { this.couponId = couponId; }
     public LocalDate getTravelDate() { return travelDate; }
     public void setTravelDate(LocalDate travelDate) { this.travelDate = travelDate; }
     public String getContactName() { return contactName; }
