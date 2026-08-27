@@ -8,19 +8,18 @@ import com.travelplatform.common.vo.PageResult;
 import com.travelplatform.contenttrip.dto.share.SharePostCreateRequest;
 import com.travelplatform.contenttrip.entity.ShareImage;
 import com.travelplatform.contenttrip.entity.SharePost;
-import com.travelplatform.contenttrip.entity.User;
 import com.travelplatform.contenttrip.mapper.ShareImageMapper;
 import com.travelplatform.contenttrip.mapper.SharePostMapper;
-import com.travelplatform.contenttrip.mapper.UserMapper;
 import com.travelplatform.contenttrip.security.CurrentUserProvider;
 import com.travelplatform.contenttrip.service.media.MediaUploadService;
 import com.travelplatform.contenttrip.service.share.ShareService;
+import com.travelplatform.contenttrip.service.user.UserBasicClient;
+import com.travelplatform.contenttrip.service.user.UserBasicInfo;
 import com.travelplatform.contenttrip.vo.share.SharePostDetailVO;
 import com.travelplatform.contenttrip.vo.share.SharePostListItemVO;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -33,20 +32,20 @@ public class ShareServiceImpl implements ShareService {
 
     private final SharePostMapper sharePostMapper;
     private final ShareImageMapper shareImageMapper;
-    private final UserMapper userMapper;
     private final CurrentUserProvider currentUserProvider;
     private final MediaUploadService mediaUploadService;
+    private final UserBasicClient userBasicClient;
 
     public ShareServiceImpl(SharePostMapper sharePostMapper,
                             ShareImageMapper shareImageMapper,
-                            UserMapper userMapper,
                             CurrentUserProvider currentUserProvider,
-                            MediaUploadService mediaUploadService) {
+                            MediaUploadService mediaUploadService,
+                            UserBasicClient userBasicClient) {
         this.sharePostMapper = sharePostMapper;
         this.shareImageMapper = shareImageMapper;
-        this.userMapper = userMapper;
         this.currentUserProvider = currentUserProvider;
         this.mediaUploadService = mediaUploadService;
+        this.userBasicClient = userBasicClient;
     }
 
     @Override
@@ -107,7 +106,7 @@ public class ShareServiceImpl implements ShareService {
         int safePageSize = pageSize == null || pageSize < 1 ? 10 : Math.min(pageSize, 20);
         Page<SharePost> page = sharePostMapper.selectPage(new Page<>(safePageNum, safePageSize), wrapper);
         List<SharePost> posts = page.getRecords();
-        Map<Long, User> userMap = loadUserMap(posts);
+        Map<Long, UserBasicInfo> userMap = loadUserMap(posts);
         Map<Long, Integer> imageCountMap = loadImageCountMap(posts);
 
         PageResult<SharePostListItemVO> result = new PageResult<>();
@@ -131,7 +130,7 @@ public class ShareServiceImpl implements ShareService {
         return toDetailVO(post);
     }
 
-    private SharePostListItemVO toListItemVO(SharePost post, User user, Integer imageCount) {
+    private SharePostListItemVO toListItemVO(SharePost post, UserBasicInfo user, Integer imageCount) {
         SharePostListItemVO vo = new SharePostListItemVO();
         vo.setId(post.getId());
         vo.setTitle(post.getTitle());
@@ -146,7 +145,7 @@ public class ShareServiceImpl implements ShareService {
     }
 
     private SharePostDetailVO toDetailVO(SharePost post) {
-        User user = userMapper.selectById(post.getUserId());
+        UserBasicInfo user = userBasicClient.listBasicUsers(List.of(post.getUserId())).get(post.getUserId());
         List<String> imageUrls = shareImageMapper.selectList(new LambdaQueryWrapper<ShareImage>()
                         .eq(ShareImage::getPostId, post.getId())
                         .orderByAsc(ShareImage::getSortNo, ShareImage::getId))
@@ -168,14 +167,12 @@ public class ShareServiceImpl implements ShareService {
         return vo;
     }
 
-    private Map<Long, User> loadUserMap(List<SharePost> posts) {
+    private Map<Long, UserBasicInfo> loadUserMap(List<SharePost> posts) {
         List<Long> userIds = posts.stream().map(SharePost::getUserId).distinct().toList();
         if (userIds.isEmpty()) {
             return Map.of();
         }
-        return userMapper.selectList(new LambdaQueryWrapper<User>().in(User::getId, userIds))
-                .stream()
-                .collect(Collectors.toMap(User::getId, user -> user));
+        return userBasicClient.listBasicUsers(userIds);
     }
 
     private Map<Long, Integer> loadImageCountMap(List<SharePost> posts) {
@@ -189,7 +186,7 @@ public class ShareServiceImpl implements ShareService {
         return countMap;
     }
 
-    private String resolveNickname(User user) {
+    private String resolveNickname(UserBasicInfo user) {
         if (user == null) {
             return "未知用户";
         }

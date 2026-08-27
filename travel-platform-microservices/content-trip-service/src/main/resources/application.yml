@@ -13,6 +13,14 @@ spring:
 service:
   version: 0.0.1-SNAPSHOT
 
+services:
+  user:
+    base-url: ${USER_SERVICE_URL:http://localhost:8101}
+  product:
+    base-url: ${PRODUCT_SERVICE_URL:http://localhost:8102}
+  order:
+    base-url: ${ORDER_SERVICE_URL:http://localhost:8103}
+
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
