@@ -133,7 +133,36 @@
 
 说明：本阶段只迁移公开读接口。发布分享、上传图片、我的分享列表依赖登录态与上传能力，待成员 A 的用户认证公共能力稳定后再接入。
 
-### 2.8 数据库配置
+### 2.8 content-trip-service 手动行程计划最小闭环
+
+已从原单体项目迁移以下接口：
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/trip-plans` | 查询当前用户行程计划列表 |
+| `POST` | `/api/trip-plans` | 创建手动行程计划 |
+| `GET` | `/api/trip-plans/{id}` | 查询当前用户行程计划详情 |
+| `PUT` | `/api/trip-plans/{id}` | 更新当前用户行程计划 |
+| `DELETE` | `/api/trip-plans/{id}` | 删除当前用户行程计划及每日安排 |
+| `POST` | `/api/trip-plans/{id}/items` | 新增每日安排 |
+| `PUT` | `/api/trip-plans/{planId}/items/{itemId}` | 更新每日安排 |
+| `DELETE` | `/api/trip-plans/{planId}/items/{itemId}` | 删除每日安排 |
+
+已迁移分层：
+
+| 层级 | 文件 |
+| --- | --- |
+| Controller | `TripPlanController` |
+| Service | `TripPlanService`、`TripPlanServiceImpl` |
+| Mapper | `TripPlanMapper`、`TripPlanItemMapper` |
+| Entity | `TripPlan`、`TripPlanItem` |
+| DTO | `TripPlanCreateRequest`、`TripPlanUpdateRequest`、`TripPlanItemCreateRequest`、`TripPlanItemUpdateRequest` |
+| VO | `TripPlanListItemVO`、`TripPlanDetailVO`、`TripPlanItemVO` |
+| Auth Adapter | `CurrentUserProvider` |
+
+说明：当前用户身份先通过请求头 `X-User-Id` 获取，后续接入网关/JWT 后只需替换 `CurrentUserProvider`。本阶段不迁移 AI 行程预览和 AI 行程保存。
+
+### 2.9 数据库配置
 
 `product-service` 已增加 MyBatis-Plus 和 MySQL 驱动依赖，并配置默认数据库：
 
@@ -163,8 +192,8 @@ travel_platform
 
 建议成员 B 按以下顺序继续：
 
-1. 迁移 `ShareController` 到 `content-trip-service`，先完成公开分享列表和详情。
-2. 迁移 `TripPlanController` 到 `content-trip-service`，登录态依赖由成员 A 的用户服务公共认证能力确定后再接入。
+1. 迁移 AI 行程预览和 AI 行程保存，先保留本地景点库规则生成，外部 AI 调用保持可选。
+2. 迁移发布分享、上传图片、我的分享列表，登录态先复用 `CurrentUserProvider`。
 3. 迁移 `ReviewController` 和 `PriceAlertController`，需要等待订单服务和产品内部快照接口稳定。
 
 ## 4. 成员B独立开发边界
@@ -212,4 +241,15 @@ GET http://localhost:8102/api/public/price-compare/tours/1
 GET http://localhost:8104/api/public/health
 GET http://localhost:8104/api/public/shares
 GET http://localhost:8104/api/public/shares/1
+GET http://localhost:8104/api/trip-plans
+POST http://localhost:8104/api/trip-plans
+GET http://localhost:8104/api/trip-plans/1
+PUT http://localhost:8104/api/trip-plans/1
+DELETE http://localhost:8104/api/trip-plans/1
+```
+
+调用 `/api/trip-plans` 私有接口时，需在请求头临时传入：
+
+```text
+X-User-Id: 1
 ```
