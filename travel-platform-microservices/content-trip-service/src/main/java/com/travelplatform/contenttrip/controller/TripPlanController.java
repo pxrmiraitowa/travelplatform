@@ -1,11 +1,15 @@
 package com.travelplatform.contenttrip.controller;
 
 import com.travelplatform.common.result.Result;
+import com.travelplatform.contenttrip.dto.tripplan.AiTripPlanPreviewRequest;
+import com.travelplatform.contenttrip.dto.tripplan.AiTripPlanSaveRequest;
 import com.travelplatform.contenttrip.dto.tripplan.TripPlanCreateRequest;
 import com.travelplatform.contenttrip.dto.tripplan.TripPlanItemCreateRequest;
 import com.travelplatform.contenttrip.dto.tripplan.TripPlanItemUpdateRequest;
 import com.travelplatform.contenttrip.dto.tripplan.TripPlanUpdateRequest;
+import com.travelplatform.contenttrip.service.tripplan.AiTripPlanService;
 import com.travelplatform.contenttrip.service.tripplan.TripPlanService;
+import com.travelplatform.contenttrip.vo.tripplan.AiTripPlanPreviewVO;
 import com.travelplatform.contenttrip.vo.tripplan.TripPlanDetailVO;
 import com.travelplatform.contenttrip.vo.tripplan.TripPlanItemVO;
 import com.travelplatform.contenttrip.vo.tripplan.TripPlanListItemVO;
@@ -26,9 +30,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class TripPlanController {
 
     private final TripPlanService tripPlanService;
+    private final AiTripPlanService aiTripPlanService;
 
-    public TripPlanController(TripPlanService tripPlanService) {
+    public TripPlanController(TripPlanService tripPlanService, AiTripPlanService aiTripPlanService) {
         this.tripPlanService = tripPlanService;
+        this.aiTripPlanService = aiTripPlanService;
     }
 
     @Operation(summary = "查询当前用户行程计划列表")
@@ -41,6 +47,18 @@ public class TripPlanController {
     @PostMapping
     public Result<TripPlanDetailVO> createPlan(@Valid @RequestBody TripPlanCreateRequest request) {
         return Result.success(tripPlanService.createPlan(request));
+    }
+
+    @Operation(summary = "AI 生成行程预览")
+    @PostMapping("/ai-preview")
+    public Result<AiTripPlanPreviewVO> previewAiPlan(@Valid @RequestBody AiTripPlanPreviewRequest request) {
+        return Result.success(aiTripPlanService.buildPreview(request));
+    }
+
+    @Operation(summary = "保存 AI 行程到我的规划")
+    @PostMapping("/ai-save")
+    public Result<TripPlanDetailVO> saveAiPlan(@Valid @RequestBody AiTripPlanSaveRequest request) {
+        return Result.success(aiTripPlanService.savePlan(request));
     }
 
     @Operation(summary = "查询行程计划详情")

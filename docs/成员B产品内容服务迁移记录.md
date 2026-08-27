@@ -162,7 +162,29 @@
 
 说明：当前用户身份先通过请求头 `X-User-Id` 获取，后续接入网关/JWT 后只需替换 `CurrentUserProvider`。本阶段不迁移 AI 行程预览和 AI 行程保存。
 
-### 2.9 数据库配置
+### 2.9 content-trip-service AI 行程本地生成闭环
+
+已从原单体项目迁移以下接口：
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `POST` | `/api/trip-plans/ai-preview` | 基于本地景点库生成 AI 行程预览 |
+| `POST` | `/api/trip-plans/ai-save` | 将 AI 行程预览保存到当前用户行程计划 |
+
+已迁移分层：
+
+| 层级 | 文件 |
+| --- | --- |
+| Controller | `TripPlanController` |
+| Service | `AiTripPlanService`、`AiTripPlanServiceImpl` |
+| Mapper | `AttractionMapper` |
+| Entity | `Attraction` |
+| DTO | `AiTripPlanPreviewRequest`、`AiTripPlanSaveRequest`、`AiTripPlanSaveDayRequest` |
+| VO | `AiTripPlanPreviewVO`、`AiTripPlanPreviewDayVO`、`AiTripPlanAttractionVO` |
+
+说明：当前迁移采用本地景点库规则生成，`generationMode` 固定为 `LOCAL_FALLBACK`，不接真实外部 AI API，保证课程演示环境稳定。
+
+### 2.10 数据库配置
 
 `product-service` 已增加 MyBatis-Plus 和 MySQL 驱动依赖，并配置默认数据库：
 
@@ -192,9 +214,8 @@ travel_platform
 
 建议成员 B 按以下顺序继续：
 
-1. 迁移 AI 行程预览和 AI 行程保存，先保留本地景点库规则生成，外部 AI 调用保持可选。
-2. 迁移发布分享、上传图片、我的分享列表，登录态先复用 `CurrentUserProvider`。
-3. 迁移 `ReviewController` 和 `PriceAlertController`，需要等待订单服务和产品内部快照接口稳定。
+1. 迁移发布分享、上传图片、我的分享列表，登录态先复用 `CurrentUserProvider`。
+2. 迁移 `ReviewController` 和 `PriceAlertController`，需要等待订单服务和产品内部快照接口稳定。
 
 ## 4. 成员B独立开发边界
 
@@ -246,6 +267,8 @@ POST http://localhost:8104/api/trip-plans
 GET http://localhost:8104/api/trip-plans/1
 PUT http://localhost:8104/api/trip-plans/1
 DELETE http://localhost:8104/api/trip-plans/1
+POST http://localhost:8104/api/trip-plans/ai-preview
+POST http://localhost:8104/api/trip-plans/ai-save
 ```
 
 调用 `/api/trip-plans` 私有接口时，需在请求头临时传入：
