@@ -9,3 +9,4 @@
 *.log
 start-dev-local.ps1
 start-dev-local.cmd
+travel-platform-microservices/build/

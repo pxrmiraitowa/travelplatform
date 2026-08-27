@@ -20,12 +20,24 @@ $services = @(
 )
 
 foreach ($service in $services) {
+    $isRunning = Test-NetConnection -ComputerName localhost -Port $service.Port -InformationLevel Quiet
+    if ($isRunning) {
+        Write-Host "$($service.Name) is already running on port $($service.Port), skipped."
+        continue
+    }
+
     $out = Join-Path $LogDir "$($service.Name).out.log"
     $err = Join-Path $LogDir "$($service.Name).err.log"
-    if (Test-Path $out) { Remove-Item -LiteralPath $out -Force }
-    if (Test-Path $err) { Remove-Item -LiteralPath $err -Force }
+    if (Test-Path $out) { Clear-Content -LiteralPath $out -ErrorAction SilentlyContinue }
+    if (Test-Path $err) { Clear-Content -LiteralPath $err -ErrorAction SilentlyContinue }
 
-    $command = "Set-Location '$Root'; `$env:JAVA_HOME='$JavaHome'; `$env:Path=`"`$env:JAVA_HOME\bin;`$env:Path`"; & '$Maven' -pl $($service.Name) spring-boot:run"
+    $javaBin = Join-Path $JavaHome "bin"
+    $command = @(
+        "Set-Location -LiteralPath '$Root'",
+        "`$env:JAVA_HOME = '$JavaHome'",
+        "`$env:Path = '$javaBin;' + `$env:Path",
+        "& '$Maven' -pl '$($service.Name)' spring-boot:run"
+    ) -join "; "
     $process = Start-Process -FilePath "powershell.exe" `
         -ArgumentList "-NoProfile", "-Command", $command `
         -WindowStyle Hidden `

@@ -37,6 +37,29 @@ mvn -pl common-lib install
 mvn -pl user-service,product-service,order-service,content-trip-service compile
 ```
 
+## Local Integration
+
+Initialize local MySQL databases before starting the services:
+
+```powershell
+cd C:\Users\han\Desktop\travelplatform\travel-platform-microservices
+powershell -ExecutionPolicy Bypass -File .\scripts\init-local-databases.ps1
+```
+
+Start the four business services and the gateway:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start-local-services.ps1
+```
+
+Run the gateway smoke test:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\smoke-gateway.ps1
+```
+
+The smoke test uses `demo_user / 123456` and `admin / 123456` by default.
+
 ## Next Migration Order
 
 1. Move shared response, constants, and exceptions into `common-lib`.
