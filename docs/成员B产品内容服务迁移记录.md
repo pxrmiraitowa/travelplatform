@@ -70,7 +70,27 @@
 | DTO | `HotelQueryRequest` |
 | VO | `HotelListItemVO`、`HotelDetailVO`、`HotelRoomVO` |
 
-### 2.5 数据库配置
+### 2.5 product-service 火车票查询最小闭环
+
+已从原单体项目迁移以下接口：
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/public/trains` | 火车票列表查询，支持出发城市、到达城市、出行日期、车次类型、价格区间和分页 |
+| `GET` | `/api/public/trains/{id}` | 火车票详情查询，返回车次基础信息和座席价格库存 |
+
+已迁移分层：
+
+| 层级 | 文件 |
+| --- | --- |
+| Controller | `TrainController` |
+| Service | `TrainService`、`TrainServiceImpl` |
+| Mapper | `TrainTicketMapper` |
+| Entity | `TrainTicket` |
+| DTO | `TrainQueryRequest` |
+| VO | `TrainListItemVO`、`TrainDetailVO`、`SeatOptionVO` |
+
+### 2.6 数据库配置
 
 `product-service` 已增加 MyBatis-Plus 和 MySQL 驱动依赖，并配置默认数据库：
 
@@ -88,11 +108,10 @@ travel_platform
 
 建议成员 B 按以下顺序继续：
 
-1. 迁移 `TrainController`、`TrainService`、`TrainTicket`，完成火车票列表和详情。
-2. 迁移 `PriceCompareController`，保留在 `product-service` 内部聚合价格比较。
-3. 迁移 `ShareController` 到 `content-trip-service`，先完成公开分享列表和详情。
-4. 迁移 `TripPlanController` 到 `content-trip-service`，登录态依赖由成员 A 的用户服务公共认证能力确定后再接入。
-5. 迁移 `ReviewController` 和 `PriceAlertController`，需要等待订单服务和产品内部快照接口稳定。
+1. 迁移 `PriceCompareController`，保留在 `product-service` 内部聚合价格比较。
+2. 迁移 `ShareController` 到 `content-trip-service`，先完成公开分享列表和详情。
+3. 迁移 `TripPlanController` 到 `content-trip-service`，登录态依赖由成员 A 的用户服务公共认证能力确定后再接入。
+4. 迁移 `ReviewController` 和 `PriceAlertController`，需要等待订单服务和产品内部快照接口稳定。
 
 ## 4. 成员B独立开发边界
 
@@ -131,4 +150,6 @@ GET http://localhost:8102/api/public/tours
 GET http://localhost:8102/api/public/tours/1
 GET http://localhost:8102/api/public/hotels
 GET http://localhost:8102/api/public/hotels/1
+GET http://localhost:8102/api/public/trains
+GET http://localhost:8102/api/public/trains/1
 ```
