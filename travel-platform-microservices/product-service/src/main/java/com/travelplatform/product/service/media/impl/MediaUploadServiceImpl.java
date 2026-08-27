@@ -44,7 +44,7 @@ public class MediaUploadServiceImpl implements MediaUploadService {
         } catch (IOException exception) {
             throw new BusinessException(ResultCode.SYSTEM_ERROR.getCode(), "图片上传失败");
         }
-        return "/api/public/uploads/" + category + "/" + dateFolder + "/" + fileName;
+        return "/api/public/product-uploads/" + category + "/" + dateFolder + "/" + fileName;
     }
 
     private void validateCategory(String category) {
