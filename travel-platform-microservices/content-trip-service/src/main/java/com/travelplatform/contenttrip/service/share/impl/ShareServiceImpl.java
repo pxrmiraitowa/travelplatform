@@ -5,12 +5,15 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.travelplatform.common.exception.BusinessException;
 import com.travelplatform.common.result.ResultCode;
 import com.travelplatform.common.vo.PageResult;
+import com.travelplatform.contenttrip.dto.share.SharePostCreateRequest;
 import com.travelplatform.contenttrip.entity.ShareImage;
 import com.travelplatform.contenttrip.entity.SharePost;
 import com.travelplatform.contenttrip.entity.User;
 import com.travelplatform.contenttrip.mapper.ShareImageMapper;
 import com.travelplatform.contenttrip.mapper.SharePostMapper;
 import com.travelplatform.contenttrip.mapper.UserMapper;
+import com.travelplatform.contenttrip.security.CurrentUserProvider;
+import com.travelplatform.contenttrip.service.media.MediaUploadService;
 import com.travelplatform.contenttrip.service.share.ShareService;
 import com.travelplatform.contenttrip.vo.share.SharePostDetailVO;
 import com.travelplatform.contenttrip.vo.share.SharePostListItemVO;
@@ -21,6 +24,7 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class ShareServiceImpl implements ShareService {
@@ -30,24 +34,78 @@ public class ShareServiceImpl implements ShareService {
     private final SharePostMapper sharePostMapper;
     private final ShareImageMapper shareImageMapper;
     private final UserMapper userMapper;
+    private final CurrentUserProvider currentUserProvider;
+    private final MediaUploadService mediaUploadService;
 
     public ShareServiceImpl(SharePostMapper sharePostMapper,
                             ShareImageMapper shareImageMapper,
-                            UserMapper userMapper) {
+                            UserMapper userMapper,
+                            CurrentUserProvider currentUserProvider,
+                            MediaUploadService mediaUploadService) {
         this.sharePostMapper = sharePostMapper;
         this.shareImageMapper = shareImageMapper;
         this.userMapper = userMapper;
+        this.currentUserProvider = currentUserProvider;
+        this.mediaUploadService = mediaUploadService;
+    }
+
+    @Override
+    public String uploadShareImage(MultipartFile file) {
+        return mediaUploadService.uploadImage("share", file);
+    }
+
+    @Override
+    @Transactional
+    public Long createSharePost(SharePostCreateRequest request) {
+        Long userId = currentUserProvider.getCurrentUserId();
+        List<String> imageUrls = request.getImageUrls().stream()
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .distinct()
+                .toList();
+        if (imageUrls.isEmpty()) {
+            throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "请至少上传一张分享图片");
+        }
+
+        SharePost post = new SharePost();
+        post.setUserId(userId);
+        post.setTitle(request.getTitle().trim());
+        post.setSummary(request.getSummary().trim());
+        post.setContent(request.getContent().trim());
+        post.setCoverImage(imageUrls.get(0));
+        post.setStatus(STATUS_VISIBLE);
+        post.setViewCount(0);
+        post.setLikeCount(0);
+        sharePostMapper.insert(post);
+
+        for (int i = 0; i < imageUrls.size(); i++) {
+            ShareImage image = new ShareImage();
+            image.setPostId(post.getId());
+            image.setImageUrl(imageUrls.get(i));
+            image.setSortNo(i + 1);
+            shareImageMapper.insert(image);
+        }
+        return post.getId();
     }
 
     @Override
     public PageResult<SharePostListItemVO> listPublicShares(Integer pageNum, Integer pageSize) {
+        return listShares(new LambdaQueryWrapper<SharePost>()
+                .eq(SharePost::getStatus, STATUS_VISIBLE)
+                .orderByDesc(SharePost::getId), pageNum, pageSize);
+    }
+
+    @Override
+    public PageResult<SharePostListItemVO> listCurrentUserShares(Integer pageNum, Integer pageSize) {
+        return listShares(new LambdaQueryWrapper<SharePost>()
+                .eq(SharePost::getUserId, currentUserProvider.getCurrentUserId())
+                .orderByDesc(SharePost::getId), pageNum, pageSize);
+    }
+
+    private PageResult<SharePostListItemVO> listShares(LambdaQueryWrapper<SharePost> wrapper, Integer pageNum, Integer pageSize) {
         int safePageNum = pageNum == null || pageNum < 1 ? 1 : pageNum;
         int safePageSize = pageSize == null || pageSize < 1 ? 10 : Math.min(pageSize, 20);
-
-        Page<SharePost> page = sharePostMapper.selectPage(new Page<>(safePageNum, safePageSize),
-                new LambdaQueryWrapper<SharePost>()
-                        .eq(SharePost::getStatus, STATUS_VISIBLE)
-                        .orderByDesc(SharePost::getId));
+        Page<SharePost> page = sharePostMapper.selectPage(new Page<>(safePageNum, safePageSize), wrapper);
         List<SharePost> posts = page.getRecords();
         Map<Long, User> userMap = loadUserMap(posts);
         Map<Long, Integer> imageCountMap = loadImageCountMap(posts);

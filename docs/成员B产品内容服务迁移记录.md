@@ -133,7 +133,28 @@
 
 说明：本阶段只迁移公开读接口。发布分享、上传图片、我的分享列表依赖登录态与上传能力，待成员 A 的用户认证公共能力稳定后再接入。
 
-### 2.8 content-trip-service 手动行程计划最小闭环
+### 2.8 content-trip-service 分享发布与我的分享闭环
+
+已从原单体项目迁移以下接口：
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `POST` | `/api/shares/upload` | 上传分享图片，返回公开访问 URL |
+| `POST` | `/api/shares` | 发布分享，写入分享正文和图片列表 |
+| `GET` | `/api/shares/mine` | 查询当前用户分享列表 |
+
+已迁移分层：
+
+| 层级 | 文件 |
+| --- | --- |
+| Controller | `ShareController` |
+| Service | `ShareService`、`ShareServiceImpl`、`MediaUploadService`、`MediaUploadServiceImpl` |
+| DTO | `SharePostCreateRequest` |
+| Config | `WebMvcConfig` |
+
+说明：私有分享接口当前复用 `CurrentUserProvider`，通过请求头 `X-User-Id` 获取当前用户。上传文件保存到 `travel.upload-dir`，并通过 `/api/public/uploads/**` 公开访问。
+
+### 2.9 content-trip-service 手动行程计划最小闭环
 
 已从原单体项目迁移以下接口：
 
@@ -162,7 +183,7 @@
 
 说明：当前用户身份先通过请求头 `X-User-Id` 获取，后续接入网关/JWT 后只需替换 `CurrentUserProvider`。本阶段不迁移 AI 行程预览和 AI 行程保存。
 
-### 2.9 content-trip-service AI 行程本地生成闭环
+### 2.10 content-trip-service AI 行程本地生成闭环
 
 已从原单体项目迁移以下接口：
 
@@ -184,7 +205,7 @@
 
 说明：当前迁移采用本地景点库规则生成，`generationMode` 固定为 `LOCAL_FALLBACK`，不接真实外部 AI API，保证课程演示环境稳定。
 
-### 2.10 数据库配置
+### 2.11 数据库配置
 
 `product-service` 已增加 MyBatis-Plus 和 MySQL 驱动依赖，并配置默认数据库：
 
@@ -214,8 +235,8 @@ travel_platform
 
 建议成员 B 按以下顺序继续：
 
-1. 迁移发布分享、上传图片、我的分享列表，登录态先复用 `CurrentUserProvider`。
-2. 迁移 `ReviewController` 和 `PriceAlertController`，需要等待订单服务和产品内部快照接口稳定。
+1. 迁移 `ReviewController` 和 `PriceAlertController`，需要等待订单服务和产品内部快照接口稳定。
+2. 梳理内容服务与用户服务的用户展示信息同步方式，逐步替代跨库读取 `user` 表。
 
 ## 4. 成员B独立开发边界
 
@@ -262,6 +283,9 @@ GET http://localhost:8102/api/public/price-compare/tours/1
 GET http://localhost:8104/api/public/health
 GET http://localhost:8104/api/public/shares
 GET http://localhost:8104/api/public/shares/1
+POST http://localhost:8104/api/shares/upload
+POST http://localhost:8104/api/shares
+GET http://localhost:8104/api/shares/mine
 GET http://localhost:8104/api/trip-plans
 POST http://localhost:8104/api/trip-plans
 GET http://localhost:8104/api/trip-plans/1

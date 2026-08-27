@@ -25,3 +25,6 @@ springdoc:
     enabled: true
   swagger-ui:
     path: /swagger-ui.html
+
+travel:
+  upload-dir: ./uploads
