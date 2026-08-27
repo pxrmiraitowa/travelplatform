@@ -46,7 +46,8 @@
           <el-table-column label="操作" width="260" fixed="right">
             <template #default="{ row }">
               <el-button link type="primary" @click="goToOrderDetail(row.id)">查看详情</el-button>
-              <el-button v-if="[10, 20].includes(row.orderStatus)" link type="danger" @click="handleCancel(row)">取消订单</el-button>
+              <el-button v-if="row.orderStatus === 10" link type="danger" @click="handleCancel(row)">取消订单</el-button>
+              <el-button v-if="row.orderStatus === 20" link type="warning" @click="handleRefund(row)">申请退款</el-button>
               <el-button v-if="row.orderStatus === 30 && !row.reviewed" link type="warning" @click="openReviewDialog(row)">去评价</el-button>
             </template>
           </el-table-column>
@@ -75,7 +76,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import SectionCard from '@/components/SectionCard.vue'
 import ReviewDialog from '@/components/review/ReviewDialog.vue'
-import { cancelOrder, getOrderList } from '@/api/order'
+import { cancelOrder, getOrderList, refundOrder } from '@/api/order'
 
 const router = useRouter()
 const loading = ref(false)
@@ -138,6 +139,13 @@ async function handleCancel(row) {
   await loadOrders()
 }
 
+async function handleRefund(row) {
+  await ElMessageBox.confirm(`确认申请订单“${row.orderNo}”退款吗？`, '退款确认', { type: 'warning' })
+  await refundOrder(row.id, '用户主动申请退款')
+  ElMessage.success('退款已完成（演示）')
+  await loadOrders()
+}
+
 function bizTypeText(bizType) {
   return {
     FLIGHT: '机票',
@@ -152,7 +160,8 @@ function statusText(status) {
     10: '待支付',
     20: '待出行',
     30: '已完成',
-    40: '已取消'
+    40: '已取消',
+    50: '已退款'
   }[status] || '未知状态'
 }
 
@@ -161,7 +170,8 @@ function statusTagType(status) {
     10: 'warning',
     20: 'primary',
     30: 'success',
-    40: 'info'
+    40: 'info',
+    50: 'info'
   }[status] || 'info'
 }
 

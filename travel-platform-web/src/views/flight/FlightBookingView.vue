@@ -128,11 +128,14 @@ async function submitOrder() {
 
   submitting.value = true
   try {
+    const contact = contacts.value.find((item) => item.id === form.contactId)
     const response = await createFlightOrder({
-      flightId: Number(route.params.id),
-      contactId: form.contactId,
-      couponId: form.couponId,
-      remark: form.remark
+      productType: 'FLIGHT',
+      productId: Number(route.params.id),
+      quantity: 1,
+      travelDate: flight.value.departureTime?.slice(0, 10),
+      contactName: contact?.name,
+      contactPhone: contact?.phone
     })
     ElMessage.success('机票订单提交成功')
     router.push({ name: 'orders', query: { highlight: response.data.id } })

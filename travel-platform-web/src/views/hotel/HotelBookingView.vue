@@ -172,14 +172,15 @@ async function submitOrder() {
   }
   submitting.value = true
   try {
+    const contact = contacts.value.find((item) => item.id === form.contactId)
     const response = await createHotelOrder({
-      hotelId: Number(route.params.id),
-      hotelRoomId: form.hotelRoomId,
-      checkInDate: form.checkInDate,
-      checkOutDate: form.checkOutDate,
-      contactId: form.contactId,
-      couponId: form.couponId,
-      remark: form.remark
+      productType: 'HOTEL',
+      productId: Number(route.params.id),
+      variantId: form.hotelRoomId,
+      quantity: 1,
+      travelDate: form.checkInDate,
+      contactName: contact?.name,
+      contactPhone: contact?.phone
     })
     ElMessage.success('酒店订单提交成功')
     router.push({ name: 'orders', query: { highlight: response.data.id } })

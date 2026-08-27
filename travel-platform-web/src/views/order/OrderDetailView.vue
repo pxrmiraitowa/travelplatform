@@ -4,7 +4,8 @@
       <template #extra>
         <el-space wrap>
           <el-button @click="router.push('/orders')">返回订单列表</el-button>
-          <el-button v-if="orderDetail && [10, 20].includes(orderDetail.orderStatus)" type="danger" @click="handleCancel">取消订单</el-button>
+          <el-button v-if="orderDetail && orderDetail.orderStatus === 10" type="danger" @click="handleCancel">取消订单</el-button>
+          <el-button v-if="orderDetail && orderDetail.orderStatus === 20" type="warning" @click="handleRefund">申请退款</el-button>
           <el-button v-if="orderDetail && orderDetail.orderStatus === 30 && !orderDetail.reviewed" type="warning" @click="reviewDialogVisible = true">去评价</el-button>
         </el-space>
       </template>
@@ -36,7 +37,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import SectionCard from '@/components/SectionCard.vue'
 import OrderDetailPanel from '@/components/order/OrderDetailPanel.vue'
 import ReviewDialog from '@/components/review/ReviewDialog.vue'
-import { cancelOrder, getOrderDetail } from '@/api/order'
+import { cancelOrder, getOrderDetail, refundOrder } from '@/api/order'
 
 const route = useRoute()
 const router = useRouter()
@@ -61,6 +62,14 @@ async function handleCancel() {
   await ElMessageBox.confirm(`确认取消订单“${orderDetail.value.orderNo}”吗？`, '取消确认', { type: 'warning' })
   await cancelOrder(orderDetail.value.id)
   ElMessage.success('订单已取消')
+  await loadOrderDetail()
+}
+
+async function handleRefund() {
+  if (!orderDetail.value) return
+  await ElMessageBox.confirm(`确认申请订单“${orderDetail.value.orderNo}”退款吗？`, '退款确认', { type: 'warning' })
+  await refundOrder(orderDetail.value.id, '用户主动申请退款')
+  ElMessage.success('退款已完成（演示）')
   await loadOrderDetail()
 }
 

@@ -1,0 +1,15 @@
+USE travel_user;
+
+CREATE TABLE IF NOT EXISTS user_contact (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id BIGINT NOT NULL,
+    name VARCHAR(50) NOT NULL,
+    phone VARCHAR(20) NOT NULL,
+    id_card VARCHAR(30) NOT NULL,
+    contact_type TINYINT NOT NULL DEFAULT 1,
+    is_default TINYINT NOT NULL DEFAULT 0,
+    remark VARCHAR(100),
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_user_contact_user_id (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

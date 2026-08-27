@@ -2,7 +2,7 @@ import request from '@/utils/request'
 
 export function createFlightOrder(data) {
   return request({
-    url: '/orders/flights',
+    url: '/orders',
     method: 'post',
     data
   })
@@ -10,7 +10,7 @@ export function createFlightOrder(data) {
 
 export function createTrainOrder(data) {
   return request({
-    url: '/orders/trains',
+    url: '/orders',
     method: 'post',
     data
   })
@@ -18,7 +18,7 @@ export function createTrainOrder(data) {
 
 export function createHotelOrder(data) {
   return request({
-    url: '/orders/hotels',
+    url: '/orders',
     method: 'post',
     data
   })
@@ -26,7 +26,7 @@ export function createHotelOrder(data) {
 
 export function createTourOrder(data) {
   return request({
-    url: '/orders/tours',
+    url: '/orders',
     method: 'post',
     data
   })
@@ -58,5 +58,13 @@ export function cancelOrder(id) {
   return request({
     url: `/orders/${id}/cancel`,
     method: 'post'
+  })
+}
+
+export function refundOrder(id, reason) {
+  return request({
+    url: `/orders/${id}/refund`,
+    method: 'post',
+    data: { reason }
   })
 }

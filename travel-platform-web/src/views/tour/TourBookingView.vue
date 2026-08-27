@@ -130,12 +130,14 @@ async function submitOrder() {
   }
   submitting.value = true
   try {
+    const contact = contacts.value.find((item) => item.id === form.contactId)
     const response = await createTourOrder({
-      tourPackageId: Number(route.params.id),
+      productType: 'TOUR',
+      productId: Number(route.params.id),
+      quantity: 1,
       travelDate: form.travelDate,
-      contactId: form.contactId,
-      couponId: form.couponId,
-      remark: form.remark
+      contactName: contact?.name,
+      contactPhone: contact?.phone
     })
     ElMessage.success('旅游产品订单提交成功')
     router.push({ name: 'orders', query: { highlight: response.data.id } })

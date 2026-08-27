@@ -6,6 +6,7 @@ public final class OrderStatusConstant {
     public static final int PAID_PENDING_TRAVEL = 20;
     public static final int COMPLETED = 30;
     public static final int CANCELLED = 40;
+    public static final int REFUNDED = 50;
 
     private OrderStatusConstant() {
     }

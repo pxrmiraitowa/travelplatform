@@ -4,9 +4,25 @@ server:
 spring:
   application:
     name: order-service
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/travel_order?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:123456}
+    driver-class-name: com.mysql.cj.jdbc.Driver
 
 service:
   version: 0.0.1-SNAPSHOT
+
+services:
+  product:
+    base-url: ${PRODUCT_SERVICE_URL:http://localhost:8102}
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
 
 springdoc:
   api-docs:

@@ -111,11 +111,15 @@ async function submitOrder() {
   }
   submitting.value = true
   try {
+    const contact = contacts.value.find(item => item.id === form.contactId)
     const response = await createTrainOrder({
-      trainTicketId: Number(route.params.id),
-      contactId: form.contactId,
-      seatType: form.seatType,
-      remark: form.remark
+      productType: 'TRAIN',
+      productId: Number(route.params.id),
+      variantName: form.seatType,
+      quantity: 1,
+      travelDate: train.value.departureTime?.slice(0, 10),
+      contactName: contact?.name,
+      contactPhone: contact?.phone
     })
     ElMessage.success('火车票订单提交成功')
     router.push({ name: 'orders', query: { highlight: response.data.id } })
