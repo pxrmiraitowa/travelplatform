@@ -4,9 +4,26 @@ server:
 spring:
   application:
     name: user-service
+  datasource:
+    url: jdbc:mysql://localhost:3306/travel_user?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
 
 service:
   version: 0.0.1-SNAPSHOT
+
+security:
+  jwt:
+    secret: travel-platform-user-service-jwt-secret-2026
+    expiration-seconds: 86400
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
 
 springdoc:
   api-docs:
