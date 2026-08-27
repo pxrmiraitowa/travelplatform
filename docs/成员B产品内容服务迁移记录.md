@@ -228,7 +228,30 @@
 
 说明：价格提醒当前通过 `LocalProductSnapshotServiceImpl` 读取本地产品表获取当前价，便于单库演示。后续若产品库完全独立，可只替换 `ProductSnapshotService` 为远程调用 `product-service` 的实现。
 
-### 2.12 数据库配置
+### 2.12 content-trip-service 订单评价最小闭环
+
+已从原单体项目迁移以下接口：
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `POST` | `/api/reviews` | 提交当前用户已完成订单评价 |
+| `GET` | `/api/orders/reviewable` | 查询当前用户可评价订单列表 |
+| `GET` | `/api/orders/{id}/review` | 查询当前用户指定订单评价 |
+
+已迁移分层：
+
+| 层级 | 文件 |
+| --- | --- |
+| Controller | `ReviewController` |
+| Service | `ReviewService`、`ReviewServiceImpl` |
+| Mapper | `ReviewMapper`、`OrdersMapper`、`OrderFlightMapper`、`OrderTrainMapper`、`OrderHotelMapper`、`OrderTourMapper` |
+| Entity | `Review`、`Orders`、`OrderFlight`、`OrderTrain`、`OrderHotel`、`OrderTour` |
+| DTO | `ReviewCreateRequest` |
+| VO | `ReviewVO`、`ReviewableOrderVO` |
+
+说明：评价模块当前按单库演示模式读取订单和订单明细快照，后续若订单库完全独立，可将订单读取部分替换为调用 `order-service` 的“可评价订单/订单详情快照”接口。
+
+### 2.13 数据库配置
 
 `product-service` 已增加 MyBatis-Plus 和 MySQL 驱动依赖，并配置默认数据库：
 
@@ -258,9 +281,10 @@ travel_platform
 
 建议成员 B 按以下顺序继续：
 
-1. 迁移 `ReviewController`，需要等待订单服务边界稳定，或先按单库演示模式迁移最小闭环。
-2. 梳理内容服务与用户服务的用户展示信息同步方式，逐步替代跨库读取 `user` 表。
-3. 抽换 `ProductSnapshotService`，由本地查询改成调用 `product-service`。
+1. 梳理内容服务与用户服务的用户展示信息同步方式，逐步替代跨库读取 `user` 表。
+2. 抽换 `ProductSnapshotService`，由本地查询改成调用 `product-service`。
+3. 抽换评价模块订单读取逻辑，由本地查询改成调用 `order-service`。
+4. 补充 `content-trip-service` 与 `product-service`、`order-service`、`user-service` 的接口契约文档。
 
 ## 4. 成员B独立开发边界
 
@@ -320,6 +344,9 @@ POST http://localhost:8104/api/trip-plans/ai-save
 GET http://localhost:8104/api/price-alerts
 POST http://localhost:8104/api/price-alerts
 DELETE http://localhost:8104/api/price-alerts/1
+POST http://localhost:8104/api/reviews
+GET http://localhost:8104/api/orders/reviewable
+GET http://localhost:8104/api/orders/1/review
 ```
 
 调用 `/api/trip-plans` 私有接口时，需在请求头临时传入：
