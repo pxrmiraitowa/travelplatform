@@ -112,7 +112,28 @@
 
 说明：`PriceCompareServiceImpl` 保留 `ProductSnapshot` 和产品类型规范化能力，供后续 `PriceAlertController` 迁移时复用。
 
-### 2.7 数据库配置
+### 2.7 content-trip-service 公开分享查询最小闭环
+
+已从原单体项目迁移以下接口：
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/public/shares` | 公开分享列表查询，支持分页，返回封面、作者和图片数量 |
+| `GET` | `/api/public/shares/{id}` | 公开分享详情查询，返回正文、作者和图片列表，并累加浏览量 |
+
+已迁移分层：
+
+| 层级 | 文件 |
+| --- | --- |
+| Controller | `ShareController` |
+| Service | `ShareService`、`ShareServiceImpl` |
+| Mapper | `SharePostMapper`、`ShareImageMapper`、`UserMapper` |
+| Entity | `SharePost`、`ShareImage`、`User`、`BaseEntity` |
+| VO | `SharePostListItemVO`、`SharePostDetailVO` |
+
+说明：本阶段只迁移公开读接口。发布分享、上传图片、我的分享列表依赖登录态与上传能力，待成员 A 的用户认证公共能力稳定后再接入。
+
+### 2.8 数据库配置
 
 `product-service` 已增加 MyBatis-Plus 和 MySQL 驱动依赖，并配置默认数据库：
 
@@ -120,7 +141,19 @@
 travel_product
 ```
 
+`content-trip-service` 已增加 MyBatis-Plus 和 MySQL 驱动依赖，并配置默认数据库：
+
+```text
+travel_content_trip
+```
+
 如本地仍使用单体数据库演示，可临时把 `product-service/src/main/resources/application.yml` 中的数据库名改为：
+
+```text
+travel_platform
+```
+
+`content-trip-service` 本地演示时同理可临时指向：
 
 ```text
 travel_platform
@@ -176,4 +209,7 @@ GET http://localhost:8102/api/public/trains/1
 GET http://localhost:8102/api/public/price-compare/hotels/1
 GET http://localhost:8102/api/public/price-compare/flights/1
 GET http://localhost:8102/api/public/price-compare/tours/1
+GET http://localhost:8104/api/public/health
+GET http://localhost:8104/api/public/shares
+GET http://localhost:8104/api/public/shares/1
 ```
