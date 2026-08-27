@@ -10,7 +10,19 @@ spring:
         - id: user-service
           uri: ${USER_SERVICE_URL:http://localhost:8101}
           predicates:
-            - Path=/api/auth/**,/api/users/**,/api/user-contacts/**,/api/admin/**
+            - Path=/api/auth/**,/api/users/**,/api/user-contacts/**,/api/admin/dashboard,/api/admin/users/**,/api/admin/roles
+        - id: admin-product-service
+          uri: ${PRODUCT_SERVICE_URL:http://localhost:8102}
+          predicates:
+            - Path=/api/admin/flights/**,/api/admin/trains/**,/api/admin/hotels/**,/api/admin/hotel-rooms/**,/api/admin/tours/**,/api/admin/media/**
+        - id: admin-order-service
+          uri: ${ORDER_SERVICE_URL:http://localhost:8103}
+          predicates:
+            - Path=/api/admin/orders/**
+        - id: admin-content-service
+          uri: ${CONTENT_TRIP_SERVICE_URL:http://localhost:8104}
+          predicates:
+            - Path=/api/admin/shares/**,/api/admin/reviews/**
         - id: product-service
           uri: ${PRODUCT_SERVICE_URL:http://localhost:8102}
           predicates:
