@@ -8,43 +8,26 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 concurrency:
   group: travel-platform-kind-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  CI_DB_PASSWORD: travel-platform-ci-db-password
+  CI_JWT_SECRET: travel-platform-ci-jwt-secret-for-kind-deployment-2026
+  KIND_CLUSTER_NAME: travel-platform-ci
+  MYSQL_SOURCE_IMAGE: mysql:8.4@sha256:1d6b6a8fcee8ff758ff151d017f5203cd06792a0e698f0a593c9dfcb14609cf0
+  MYSQL_KIND_IMAGE: mysql:8.4-kind-amd64
+
 jobs:
-  build-test-package-deploy:
-    name: Build, test, package and deploy
+  build:
+    name: 1. Compile
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-
-    services:
-      mysql:
-        image: mysql:8.4
-        env:
-          MYSQL_DATABASE: travel_platform_it
-          MYSQL_ROOT_PASSWORD: travel-platform-ci-db-password
-          TZ: Asia/Shanghai
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -ptravel-platform-ci-db-password --silent"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=30
-          --health-start-period=20s
-
-    env:
-      CI_DB_PASSWORD: travel-platform-ci-db-password
-      CI_JWT_SECRET: travel-platform-ci-jwt-secret-for-kind-deployment-2026
-      KIND_CLUSTER_NAME: travel-platform-ci
-      MYSQL_SOURCE_IMAGE: mysql:8.4@sha256:1d6b6a8fcee8ff758ff151d017f5203cd06792a0e698f0a593c9dfcb14609cf0
-      MYSQL_KIND_IMAGE: mysql:8.4-kind-amd64
+    timeout-minutes: 20
 
     steps:
-      - name: 1. Check out source code
+      - name: Check out source code
         uses: actions/checkout@v7
 
       - name: Prepare evidence directory
@@ -65,31 +48,156 @@ jobs:
           cache: npm
           cache-dependency-path: travel-platform-web/package-lock.json
 
-      - name: 2. Install backend dependencies
+      - name: Install backend dependencies
         working-directory: travel-platform-server
         run: mvn -B dependency:go-offline | tee ../artifacts/backend-dependencies.log
 
-      - name: 2. Install frontend dependencies
+      - name: Install frontend dependencies
         working-directory: travel-platform-web
         run: npm ci | tee ../artifacts/frontend-dependencies.log
 
-      - name: 3. Compile backend
+      - name: Compile and package backend
         working-directory: travel-platform-server
-        run: mvn -B -DskipTests clean compile | tee ../artifacts/backend-compile.log
+        run: mvn -B -DskipTests clean package | tee ../artifacts/backend-build.log
 
-      - name: 3. Compile frontend
+      - name: Compile frontend
         working-directory: travel-platform-web
         run: npm run build | tee ../artifacts/frontend-build.log
 
-      - name: 4. Run backend unit tests
+      - name: Retain compiled artifacts and build logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-output-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            artifacts/**
+            travel-platform-server/target/*.jar
+            travel-platform-web/dist/**
+
+  backend_unit_test:
+    name: 2. Backend unit tests
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v7
+
+      - name: Prepare evidence directory
+        run: mkdir -p artifacts
+
+      - name: Set up JDK 17 and Maven cache
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+          cache-dependency-path: travel-platform-server/pom.xml
+
+      - name: Install backend dependencies
+        working-directory: travel-platform-server
+        run: mvn -B dependency:go-offline | tee ../artifacts/backend-dependencies.log
+
+      - name: Run backend unit tests
         working-directory: travel-platform-server
         run: mvn -B "-Dtest=!*IntegrationTest" test | tee ../artifacts/backend-unit-tests.log
 
-      - name: 4. Run frontend unit tests
+      - name: Retain backend unit-test evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-unit-test-evidence-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            artifacts/**
+            travel-platform-server/target/surefire-reports/**
+            travel-platform-server/target/site/jacoco/**
+
+  frontend_unit_test:
+    name: 3. Frontend unit tests
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v7
+
+      - name: Prepare evidence directory
+        run: mkdir -p artifacts
+
+      - name: Set up Node.js 22 and npm cache
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: travel-platform-web/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: travel-platform-web
+        run: npm ci | tee ../artifacts/frontend-dependencies.log
+
+      - name: Run frontend unit tests
         working-directory: travel-platform-web
         run: npm run test:unit | tee ../artifacts/frontend-unit-tests.log
 
-      - name: 5. Run backend integration tests
+      - name: Retain frontend unit-test evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-unit-test-evidence-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: artifacts/**
+
+  integration_test:
+    name: 4. Integration tests
+    needs:
+      - backend_unit_test
+      - frontend_unit_test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: travel_platform_it
+          MYSQL_ROOT_PASSWORD: travel-platform-ci-db-password
+          TZ: Asia/Shanghai
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -ptravel-platform-ci-db-password --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+          --health-start-period=20s
+
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v7
+
+      - name: Prepare evidence directory
+        run: mkdir -p artifacts
+
+      - name: Set up JDK 17 and Maven cache
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+          cache-dependency-path: travel-platform-server/pom.xml
+
+      - name: Install backend dependencies
+        working-directory: travel-platform-server
+        run: mvn -B dependency:go-offline | tee ../artifacts/backend-dependencies.log
+
+      - name: Run backend integration tests
         working-directory: travel-platform-server
         env:
           SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/travel_platform_it?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
@@ -97,16 +205,64 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: ${{ env.CI_DB_PASSWORD }}
         run: mvn -B "-Dtest=*IntegrationTest" test | tee ../artifacts/backend-integration-tests.log
 
+      - name: Retain integration-test evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: integration-test-evidence-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            artifacts/**
+            travel-platform-server/target/surefire-reports/**
+            travel-platform-server/target/site/jacoco/**
+
+  build_images:
+    name: 5. Build and push images
+    needs: integration_test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      backend_image: ${{ steps.image_metadata.outputs.backend_image }}
+      frontend_image: ${{ steps.image_metadata.outputs.frontend_image }}
+      image_tag: ${{ steps.image_metadata.outputs.image_tag }}
+      release_tag: ${{ steps.image_metadata.outputs.release_tag }}
+      backend_digest: ${{ steps.build_backend.outputs.digest }}
+      frontend_digest: ${{ steps.build_frontend.outputs.digest }}
+
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v7
+
+      - name: Prepare evidence directory
+        run: mkdir -p artifacts
+
       - name: Prepare versioned image names
+        id: image_metadata
         shell: bash
         run: |
           owner_lower="${GITHUB_REPOSITORY_OWNER,,}"
           short_sha="${GITHUB_SHA::12}"
+          backend_image="ghcr.io/${owner_lower}/travel-platform-server"
+          frontend_image="ghcr.io/${owner_lower}/travel-platform-web"
+          image_tag="sha-${short_sha}"
+          release_tag="0.1.${GITHUB_RUN_NUMBER}"
+
           {
-            echo "BACKEND_IMAGE=ghcr.io/${owner_lower}/travel-platform-server"
-            echo "FRONTEND_IMAGE=ghcr.io/${owner_lower}/travel-platform-web"
-            echo "IMAGE_TAG=sha-${short_sha}"
-            echo "RELEASE_TAG=0.1.${GITHUB_RUN_NUMBER}"
+            echo "backend_image=${backend_image}"
+            echo "frontend_image=${frontend_image}"
+            echo "image_tag=${image_tag}"
+            echo "release_tag=${release_tag}"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "BACKEND_IMAGE=${backend_image}"
+            echo "FRONTEND_IMAGE=${frontend_image}"
+            echo "IMAGE_TAG=${image_tag}"
+            echo "RELEASE_TAG=${release_tag}"
           } >> "$GITHUB_ENV"
 
       - name: Log in to GHCR
@@ -119,12 +275,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: 6. Build versioned backend image
+      - name: Build and push versioned backend image
+        id: build_backend
         uses: docker/build-push-action@v7
         with:
           context: ./travel-platform-server
-          load: true
-          push: false
+          push: true
           provenance: false
           tags: |
             ${{ env.BACKEND_IMAGE }}:${{ env.IMAGE_TAG }}
@@ -132,12 +288,12 @@ jobs:
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
 
-      - name: 6. Build versioned frontend image
+      - name: Build and push versioned frontend image
+        id: build_frontend
         uses: docker/build-push-action@v7
         with:
           context: ./travel-platform-web
-          load: true
-          push: false
+          push: true
           provenance: false
           tags: |
             ${{ env.FRONTEND_IMAGE }}:${{ env.IMAGE_TAG }}
@@ -145,15 +301,66 @@ jobs:
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
 
-      - name: Push versioned images to GHCR
+      - name: Record pushed image versions
         shell: bash
         run: |
-          docker push "${BACKEND_IMAGE}:${IMAGE_TAG}" | tee artifacts/backend-image-push.log
-          docker push "${BACKEND_IMAGE}:${RELEASE_TAG}" | tee -a artifacts/backend-image-push.log
-          docker push "${FRONTEND_IMAGE}:${IMAGE_TAG}" | tee artifacts/frontend-image-push.log
-          docker push "${FRONTEND_IMAGE}:${RELEASE_TAG}" | tee -a artifacts/frontend-image-push.log
-          docker image inspect "${BACKEND_IMAGE}:${IMAGE_TAG}" "${FRONTEND_IMAGE}:${IMAGE_TAG}" \
-            --format '{{.RepoTags}} {{.Id}}' | tee artifacts/image-versions.log
+          {
+            echo "backend_image=${BACKEND_IMAGE}:${IMAGE_TAG}"
+            echo "backend_release=${BACKEND_IMAGE}:${RELEASE_TAG}"
+            echo "backend_digest=${{ steps.build_backend.outputs.digest }}"
+            echo "frontend_image=${FRONTEND_IMAGE}:${IMAGE_TAG}"
+            echo "frontend_release=${FRONTEND_IMAGE}:${RELEASE_TAG}"
+            echo "frontend_digest=${{ steps.build_frontend.outputs.digest }}"
+          } | tee artifacts/image-versions.log
+
+      - name: Save image-build result
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "repository=${GITHUB_REPOSITORY}"
+            echo "branch=${GITHUB_REF_NAME}"
+            echo "commit=${GITHUB_SHA}"
+            echo "run_id=${GITHUB_RUN_ID}"
+            echo "run_number=${GITHUB_RUN_NUMBER}"
+            echo "result=${{ job.status }}"
+          } > artifacts/run-summary.txt
+
+      - name: Retain image-build evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: image-build-evidence-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: artifacts/**
+
+  deploy_and_health_check:
+    name: 6. Deploy and health check
+    needs: build_images
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+      packages: read
+    env:
+      BACKEND_IMAGE: ${{ needs.build_images.outputs.backend_image }}
+      FRONTEND_IMAGE: ${{ needs.build_images.outputs.frontend_image }}
+      IMAGE_TAG: ${{ needs.build_images.outputs.image_tag }}
+
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v7
+
+      - name: Prepare evidence directory
+        run: mkdir -p artifacts
+
+      - name: Log in to GHCR for deployment
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Kind v0.32.0
         shell: bash
@@ -172,22 +379,25 @@ jobs:
           --config deploy/kind/cluster.yaml
           --wait 180s
 
-      - name: Load application images into Kind
+      - name: Pull and load deployment images into Kind
         shell: bash
         run: |
           docker pull "${MYSQL_SOURCE_IMAGE}"
           docker tag "${MYSQL_SOURCE_IMAGE}" "${MYSQL_KIND_IMAGE}"
+          docker pull "${BACKEND_IMAGE}:${IMAGE_TAG}" | tee artifacts/backend-image-pull.log
+          docker pull "${FRONTEND_IMAGE}:${IMAGE_TAG}" | tee artifacts/frontend-image-pull.log
+
           kind load docker-image "${MYSQL_KIND_IMAGE}" --name "${KIND_CLUSTER_NAME}"
           kind load docker-image "${BACKEND_IMAGE}:${IMAGE_TAG}" --name "${KIND_CLUSTER_NAME}"
           kind load docker-image "${FRONTEND_IMAGE}:${IMAGE_TAG}" --name "${KIND_CLUSTER_NAME}"
 
-      - name: 7. Deploy to Kubernetes
+      - name: Deploy to Kubernetes
         env:
           MYSQL_ROOT_PASSWORD: ${{ env.CI_DB_PASSWORD }}
           JWT_SECRET: ${{ env.CI_JWT_SECRET }}
         run: bash scripts/deploy-kind.sh | tee artifacts/kubernetes-deploy.log
 
-      - name: 8. Run Kubernetes health checks
+      - name: Run Kubernetes health checks
         run: bash scripts/health-check.sh | tee artifacts/kubernetes-health-check.log
 
       - name: Collect Docker and Kubernetes diagnostics
@@ -196,17 +406,12 @@ jobs:
         run: |
           mkdir -p artifacts
           docker ps -a > artifacts/docker-containers.txt 2>&1 || true
-          mysql_container="$(docker ps -aq --filter ancestor=mysql:8.4 | head -n 1)"
-          if [[ -n "$mysql_container" ]]; then
-            docker logs "$mysql_container" > artifacts/ci-mysql.log 2>&1 || true
-          fi
           bash scripts/collect-k8s-logs.sh artifacts/k8s || true
 
-      - name: Save workflow result
+      - name: Save deployment result
         if: always()
         shell: bash
         run: |
-          mkdir -p artifacts
           {
             echo "repository=${GITHUB_REPOSITORY}"
             echo "branch=${GITHUB_REF_NAME}"
@@ -214,18 +419,17 @@ jobs:
             echo "run_id=${GITHUB_RUN_ID}"
             echo "run_number=${GITHUB_RUN_NUMBER}"
             echo "result=${{ job.status }}"
-            echo "backend_image=${BACKEND_IMAGE:-not-built}:${IMAGE_TAG:-not-built}"
-            echo "frontend_image=${FRONTEND_IMAGE:-not-built}:${IMAGE_TAG:-not-built}"
+            echo "backend_image=${BACKEND_IMAGE}:${IMAGE_TAG}"
+            echo "frontend_image=${FRONTEND_IMAGE}:${IMAGE_TAG}"
+            echo "backend_digest=${{ needs.build_images.outputs.backend_digest }}"
+            echo "frontend_digest=${{ needs.build_images.outputs.frontend_digest }}"
           } > artifacts/run-summary.txt
 
-      - name: Retain success or failure evidence
+      - name: Retain deployment and health-check evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ci-cd-evidence-${{ github.run_id }}
+          name: deployment-evidence-${{ github.run_id }}
           if-no-files-found: warn
           retention-days: 30
-          path: |
-            artifacts/**
-            travel-platform-server/target/surefire-reports/**
-            travel-platform-server/target/site/jacoco/**
+          path: artifacts/**
