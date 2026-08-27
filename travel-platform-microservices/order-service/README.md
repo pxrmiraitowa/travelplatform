@@ -11,4 +11,6 @@
 已有单体版 `orders` 表时，按顺序执行 `order-service-v2-migration.sql` 和
 `order-service-v3-refund-migration.sql`，不会删除历史订单。
 
-客户端身份暂由网关透传的 `X-User-Id` 请求头提供。创建订单时订单服务调用商品公开详情接口并保存价格和展示快照；后续商品服务提供内部快照接口后，只替换 `ProductSnapshotClient` 适配实现。
+客户端身份暂由网关透传的 `X-User-Id` 请求头提供。创建订单时订单服务调用
+product-service 的 `/api/internal/products/snapshot` 内部接口，并保存服务端返回的价格、
+名称、摘要和库存快照，不信任前端传入的价格。
