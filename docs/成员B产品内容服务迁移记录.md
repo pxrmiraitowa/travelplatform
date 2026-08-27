@@ -205,7 +205,30 @@
 
 说明：当前迁移采用本地景点库规则生成，`generationMode` 固定为 `LOCAL_FALLBACK`，不接真实外部 AI API，保证课程演示环境稳定。
 
-### 2.11 数据库配置
+### 2.11 content-trip-service 价格提醒最小闭环
+
+已从原单体项目迁移以下接口：
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| `GET` | `/api/price-alerts` | 查询当前用户价格提醒列表 |
+| `POST` | `/api/price-alerts` | 创建价格提醒，校验产品类型和当前价格 |
+| `DELETE` | `/api/price-alerts/{id}` | 删除当前用户价格提醒 |
+
+已迁移分层：
+
+| 层级 | 文件 |
+| --- | --- |
+| Controller | `PriceAlertController` |
+| Service | `PriceAlertService`、`PriceAlertServiceImpl`、`ProductSnapshotService`、`LocalProductSnapshotServiceImpl` |
+| Mapper | `PriceAlertMapper`、`FlightMapper`、`HotelMapper`、`HotelRoomMapper`、`TourPackageMapper` |
+| Entity | `PriceAlert`、`Flight`、`Hotel`、`HotelRoom`、`TourPackage` |
+| DTO | `PriceAlertCreateRequest` |
+| VO | `PriceAlertVO` |
+
+说明：价格提醒当前通过 `LocalProductSnapshotServiceImpl` 读取本地产品表获取当前价，便于单库演示。后续若产品库完全独立，可只替换 `ProductSnapshotService` 为远程调用 `product-service` 的实现。
+
+### 2.12 数据库配置
 
 `product-service` 已增加 MyBatis-Plus 和 MySQL 驱动依赖，并配置默认数据库：
 
@@ -235,8 +258,9 @@ travel_platform
 
 建议成员 B 按以下顺序继续：
 
-1. 迁移 `ReviewController` 和 `PriceAlertController`，需要等待订单服务和产品内部快照接口稳定。
+1. 迁移 `ReviewController`，需要等待订单服务边界稳定，或先按单库演示模式迁移最小闭环。
 2. 梳理内容服务与用户服务的用户展示信息同步方式，逐步替代跨库读取 `user` 表。
+3. 抽换 `ProductSnapshotService`，由本地查询改成调用 `product-service`。
 
 ## 4. 成员B独立开发边界
 
@@ -293,6 +317,9 @@ PUT http://localhost:8104/api/trip-plans/1
 DELETE http://localhost:8104/api/trip-plans/1
 POST http://localhost:8104/api/trip-plans/ai-preview
 POST http://localhost:8104/api/trip-plans/ai-save
+GET http://localhost:8104/api/price-alerts
+POST http://localhost:8104/api/price-alerts
+DELETE http://localhost:8104/api/price-alerts/1
 ```
 
 调用 `/api/trip-plans` 私有接口时，需在请求头临时传入：
