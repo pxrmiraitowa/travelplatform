@@ -37,7 +37,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import SectionCard from '@/components/SectionCard.vue'
 import OrderDetailPanel from '@/components/order/OrderDetailPanel.vue'
 import ReviewDialog from '@/components/review/ReviewDialog.vue'
-import { cancelOrder, getOrderDetail, refundOrder } from '@/api/order'
+import { cancelOrder, getOrderDetail, getOrderReview, refundOrder } from '@/api/order'
 
 const route = useRoute()
 const router = useRouter()
@@ -49,7 +49,13 @@ async function loadOrderDetail() {
   loading.value = true
   try {
     const response = await getOrderDetail(route.params.id)
-    orderDetail.value = response.data
+    const detail = response.data
+    if (detail?.orderStatus === 30) {
+      const reviewResponse = await getOrderReview(detail.id).catch(() => null)
+      detail.reviewInfo = reviewResponse?.data || null
+      detail.reviewed = !!detail.reviewInfo
+    }
+    orderDetail.value = detail
   } finally {
     loading.value = false
   }

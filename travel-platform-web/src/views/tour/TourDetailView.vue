@@ -3,7 +3,11 @@
     <SectionCard title="旅游产品详情" description="查看产品信息、可选出行日期，以及同类产品价格对比和优惠提醒。">
       <div v-if="tour" class="detail-grid">
         <div v-if="heroImage" class="hero-image">
-          <el-image :src="heroImage" fit="cover" :preview-src-list="galleryImages.length ? galleryImages : [heroImage]" preview-teleported />
+          <el-image :src="heroImage" fit="cover" :preview-src-list="galleryImages.length ? galleryImages : [heroImage]" preview-teleported>
+            <template #error>
+              <div class="image-fallback">暂无图片</div>
+            </template>
+          </el-image>
         </div>
 
         <div class="hero-row">
@@ -22,7 +26,11 @@
 
         <div v-if="galleryImages.length > 1" class="gallery-grid">
           <div v-for="image in galleryImages" :key="image" class="gallery-card">
-            <el-image :src="image" fit="cover" :preview-src-list="galleryImages" preview-teleported />
+            <el-image :src="image" fit="cover" :preview-src-list="galleryImages" preview-teleported>
+              <template #error>
+                <div class="image-fallback image-fallback--small">暂无图片</div>
+              </template>
+            </el-image>
           </div>
         </div>
 
@@ -212,6 +220,19 @@ onMounted(() => {
   object-fit: cover;
 }
 
+.image-fallback {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 360px;
+  color: #64748b;
+  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+}
+
+.image-fallback--small {
+  height: 180px;
+}
+
 .date-tags {
   display: flex;
   gap: 8px;
@@ -230,6 +251,10 @@ onMounted(() => {
 
 @media (max-width: 768px) {
   .hero-image :deep(img) {
+    height: 240px;
+  }
+
+  .image-fallback {
     height: 240px;
   }
 }

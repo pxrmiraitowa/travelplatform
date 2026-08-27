@@ -76,7 +76,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import SectionCard from '@/components/SectionCard.vue'
 import ReviewDialog from '@/components/review/ReviewDialog.vue'
-import { cancelOrder, getOrderList, refundOrder } from '@/api/order'
+import { cancelOrder, getOrderList, getOrderReview, refundOrder } from '@/api/order'
 
 const router = useRouter()
 const loading = ref(false)
@@ -104,13 +104,27 @@ async function loadOrders() {
       pageNum: pagination.pageNum,
       pageSize: pagination.pageSize
     })
-    orders.value = response.data.records || []
+    const records = response.data.records || []
+    orders.value = await withReviewState(records)
     pagination.total = response.data.total || 0
     pagination.pageNum = response.data.pageNum || 1
     pagination.pageSize = response.data.pageSize || 10
   } finally {
     loading.value = false
   }
+}
+
+async function withReviewState(records) {
+  return Promise.all(records.map(async (order) => {
+    if (order.orderStatus !== 30) {
+      return order
+    }
+    const reviewResponse = await getOrderReview(order.id).catch(() => null)
+    return {
+      ...order,
+      reviewed: !!reviewResponse?.data
+    }
+  }))
 }
 
 function handleSearch() {
