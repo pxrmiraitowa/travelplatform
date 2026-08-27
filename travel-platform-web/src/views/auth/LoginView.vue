@@ -1,6 +1,16 @@
 <template>
   <div class="auth-page">
     <div class="auth-card">
+      <button
+        type="button"
+        class="auth-card__close"
+        aria-label="返回登录前页面"
+        title="返回登录前页面"
+        @click="handleClose"
+      >
+        <span aria-hidden="true">×</span>
+      </button>
+
       <div class="auth-intro">
         <span class="hero-tag">账户中心</span>
         <h2>登录或注册出行旅游平台</h2>
@@ -97,6 +107,15 @@ const registerRules = {
   phone: [{ required: true, message: '请输入手机号', trigger: 'blur' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
   confirmPassword: [{ required: true, message: '请输入确认密码', trigger: 'blur' }]
+}
+
+function handleClose() {
+  if (window.history.state?.back) {
+    router.back()
+    return
+  }
+
+  router.push('/')
 }
 
 function handleLoginSuccess(payload, successMessage) {

@@ -124,6 +124,18 @@ docker compose down -v
 docker compose up -d --build
 ```
 
+修改代码后，由于代码已经打包进镜像，源码变化后需要重新构建前端容器：
+```powershell
+docker compose up -d --no-deps --build frontend
+```
+后端：
+```powershell
+docker compose up -d --no-deps --build backend
+```
+前后端：
+```powershell
+docker compose up -d --build
+```
 ### 4.2 GitHub Actions + GHCR + Kind 自动流水线
 
 仓库提供 [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml)。向 GitHub 仓库的 `dev` 分支 push 后，流水线会在同一个串行作业中依次执行：
