@@ -22,9 +22,14 @@ if [ ! -f "$DATA_SQL" ]; then
 fi
 
 if [ ! -f "$JDBC_JAR" ]; then
-  mvn -q -pl product-service -am dependency:go-offline
+  echo "Downloading MySQL JDBC driver..."
+  mvn -q org.apache.maven.plugins:maven-dependency-plugin:3.6.1:get \
+    -Dartifact=com.mysql:mysql-connector-j:8.3.0 \
+    -Dtransitive=true
 fi
 
+echo "Compiling SQL runner..."
 mkdir -p "$BUILD_DIR"
 javac -encoding UTF-8 -cp "$JDBC_JAR" -d "$BUILD_DIR" "$ROOT/tools/SqlRunner.java"
+echo "Initializing microservice databases..."
 java -cp "$BUILD_DIR:$JDBC_JAR" SqlRunner "$MYSQL_URL" "$MYSQL_USERNAME" "$MYSQL_PASSWORD" "$SCHEMA_SQL" "$DATA_SQL"
