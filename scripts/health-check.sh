@@ -49,6 +49,16 @@ for service in user-service:8101 product-service:8102 order-service:8103 content
     exit 1
   fi
   echo "${service_name} health: ${response}"
+
+  version_response="$(kubectl --namespace "${NAMESPACE}" exec \
+    "deployment/${service_name}" -- \
+    curl --fail --silent --show-error \
+    "http://127.0.0.1:${service_port}/api/public/version")"
+  if [[ "${version_response}" != *'"code":200'* || "${version_response}" != *'"version"'* ]]; then
+    echo "${service_name} version check returned an unexpected body: ${version_response}" >&2
+    exit 1
+  fi
+  echo "${service_name} version: ${version_response}"
 done
 
 curl --fail --silent --show-error \

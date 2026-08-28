@@ -25,11 +25,9 @@ describe.sequential('public API regression through gateway', () => {
     for (const [name, base] of Object.entries(DIRECT_SERVICE_BASES)) {
       const health = await api('/public/health', { base })
       expect(health.data.status, `${name} health`).toBe('UP')
-      if (name !== 'gateway') {
-        const version = await api('/public/version', { base })
-        expect(version.data.service || version.data.serviceName, `${name} version service name`).toBeTruthy()
-        expect(version.data.version, `${name} version`).toBeTruthy()
-      }
+      const version = await api('/public/version', { base })
+      expect(version.data.service || version.data.serviceName, `${name} version service name`).toBeTruthy()
+      expect(version.data.version, `${name} version`).toBeTruthy()
     }
   })
 

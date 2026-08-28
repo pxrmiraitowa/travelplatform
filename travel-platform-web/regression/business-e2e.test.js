@@ -98,7 +98,7 @@ describe.sequential('end-to-end business scenario regression through gateway', (
 
   it('UC03 covers flight query, detail, coupon order, and cancel', async () => {
     const flight = firstRecord(await api('/public/flights?pageNum=1&pageSize=10'), 'flights')
-    expect((await api(`/public/flights/${flight.id}`)).data.id).toBe(flight.id)
+    const stockBeforeOrder = Number((await api(`/public/flights/${flight.id}`)).data.stock)
     const order = await createOrder(userToken, {
       productType: 'FLIGHT',
       productId: flight.id,
@@ -106,8 +106,10 @@ describe.sequential('end-to-end business scenario regression through gateway', (
       travelDate: '2030-07-02'
     })
     expect(Number(order.discountAmount)).toBeGreaterThan(0)
+    expect(Number((await api(`/public/flights/${flight.id}`)).data.stock)).toBe(stockBeforeOrder - 1)
     expect((await api(`/orders/${order.id}`, { token: userToken })).data.id).toBe(order.id)
     expect((await api(`/orders/${order.id}/cancel`, { method: 'POST', token: userToken })).data.orderStatus).toBe(40)
+    expect(Number((await api(`/public/flights/${flight.id}`)).data.stock)).toBe(stockBeforeOrder)
   })
 
   it('UC04 covers train query, detail, order, pay, and refund', async () => {
@@ -194,6 +196,7 @@ describe.sequential('end-to-end business scenario regression through gateway', (
     })
     const planId = plan.data.id
     expect(planId).toBeTruthy()
+    expect((await api(`/trip-plans/${planId}`, { token: userToken })).data.id).toBe(planId)
     expect(records(await api('/trip-plans', { token: userToken })).some(item => item.id === planId)).toBe(true)
 
     const updatedPlan = await api(`/trip-plans/${planId}`, {
@@ -286,6 +289,8 @@ describe.sequential('end-to-end business scenario regression through gateway', (
     expect(createdShareId).toBeTruthy()
     expect(records(await api('/shares/mine?pageNum=1&pageSize=20', { token: userToken })).some(item => item.id === createdShareId)).toBe(true)
     expect((await api(`/public/shares/${createdShareId}`)).data.title).toContain('游记回归')
+    await api(`/shares/${createdShareId}`, { method: 'DELETE', token: userToken })
+    createdShareId = null
   })
 
   it('UC12 compares prices and manages price alerts', async () => {
@@ -330,6 +335,7 @@ describe.sequential('end-to-end business scenario regression through gateway', (
         status: 1
       }
     })
+    expect(records(await api('/admin/flights?pageNum=1&pageSize=50', { token: adminToken })).some(item => item.id === flight.data.id)).toBe(true)
     await api(`/admin/flights/${flight.data.id}`, {
       method: 'PUT',
       token: adminToken,
@@ -359,6 +365,12 @@ describe.sequential('end-to-end business scenario regression through gateway', (
         status: 1
       }
     })
+    expect(records(await api('/admin/trains?pageNum=1&pageSize=50', { token: adminToken })).some(item => item.id === train.data.id)).toBe(true)
+    await api(`/admin/trains/${train.data.id}`, {
+      method: 'PUT',
+      token: adminToken,
+      body: { ...train.data, trainType: '高铁-已修改', departureTime: '2030-09-02T08:00:00', arrivalTime: '2030-09-02T09:00:00', status: 1 }
+    })
     await api(`/admin/trains/${train.data.id}`, { method: 'DELETE', token: adminToken })
 
     const hotel = await api('/admin/hotels', {
@@ -378,6 +390,10 @@ describe.sequential('end-to-end business scenario regression through gateway', (
         status: 1
       }
     })
+    expect(records(await api('/admin/hotels?pageNum=1&pageSize=50', { token: adminToken })).some(item => item.id === hotel.data.id)).toBe(true)
+    await api(`/admin/hotels/${hotel.data.id}`, {
+      method: 'PUT', token: adminToken, body: { ...hotel.data, description: '端到端回归酒店已修改', status: 1 }
+    })
     const room = await api('/admin/hotel-rooms', {
       method: 'POST',
       token: adminToken,
@@ -393,6 +409,10 @@ describe.sequential('end-to-end business scenario regression through gateway', (
         cancelRule: '可取消',
         status: 1
       }
+    })
+    expect(records(await api(`/admin/hotel-rooms?hotelId=${hotel.data.id}&pageNum=1&pageSize=50`, { token: adminToken })).some(item => item.id === room.data.id)).toBe(true)
+    await api(`/admin/hotel-rooms/${room.data.id}`, {
+      method: 'PUT', token: adminToken, body: { ...room.data, roomName: '回归大床房已修改', status: 1 }
     })
     await api(`/admin/hotel-rooms/${room.data.id}`, { method: 'DELETE', token: adminToken })
     await api(`/admin/hotels/${hotel.data.id}`, { method: 'DELETE', token: adminToken })
@@ -414,6 +434,10 @@ describe.sequential('end-to-end business scenario regression through gateway', (
         status: 1
       }
     })
+    expect(records(await api('/admin/tours?pageNum=1&pageSize=50', { token: adminToken })).some(item => item.id === tour.data.id)).toBe(true)
+    await api(`/admin/tours/${tour.data.id}`, {
+      method: 'PUT', token: adminToken, body: { ...tour.data, description: '端到端回归旅游产品已修改', status: 1 }
+    })
     await api(`/admin/tours/${tour.data.id}`, { method: 'DELETE', token: adminToken })
   })
 
@@ -424,6 +448,7 @@ describe.sequential('end-to-end business scenario regression through gateway', (
     const userList = await api(`/admin/users?keyword=${username}&pageNum=1&pageSize=10`, { token: adminToken })
     const managedUser = records(userList).find(item => item.username === username)
     expect(managedUser.id).toBe(currentUser.id)
+    expect((await api(`/admin/users/${managedUser.id}`, { token: adminToken })).data.id).toBe(managedUser.id)
     await api(`/admin/users/${managedUser.id}/status`, { method: 'PUT', token: adminToken, body: { status: 1 } })
     await api(`/admin/users/${managedUser.id}/roles`, { method: 'PUT', token: adminToken, body: { roleCodes: ['ROLE_USER'] } })
     expect(records(await api('/admin/roles', { token: adminToken })).length).toBeGreaterThan(0)

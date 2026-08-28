@@ -17,4 +17,6 @@ public interface ShareService {
     PageResult<SharePostListItemVO> listCurrentUserShares(Integer pageNum, Integer pageSize);
 
     SharePostDetailVO getPublicShareDetail(Long id);
+
+    void deleteCurrentUserShare(Long id);
 }

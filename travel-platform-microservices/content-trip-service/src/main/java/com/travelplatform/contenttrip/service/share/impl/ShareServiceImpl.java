@@ -130,6 +130,20 @@ public class ShareServiceImpl implements ShareService {
         return toDetailVO(post);
     }
 
+    @Override
+    @Transactional
+    public void deleteCurrentUserShare(Long id) {
+        SharePost post = sharePostMapper.selectById(id);
+        if (post == null) {
+            throw new BusinessException(ResultCode.NOT_FOUND.getCode(), "分享不存在");
+        }
+        if (!post.getUserId().equals(currentUserProvider.getCurrentUserId())) {
+            throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "无权删除该分享");
+        }
+        shareImageMapper.delete(new LambdaQueryWrapper<ShareImage>().eq(ShareImage::getPostId, id));
+        sharePostMapper.deleteById(id);
+    }
+
     private SharePostListItemVO toListItemVO(SharePost post, UserBasicInfo user, Integer imageCount) {
         SharePostListItemVO vo = new SharePostListItemVO();
         vo.setId(post.getId());

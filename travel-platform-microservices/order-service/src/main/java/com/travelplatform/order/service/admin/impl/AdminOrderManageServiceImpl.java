@@ -10,6 +10,7 @@ import com.travelplatform.common.result.ResultCode;
 import com.travelplatform.common.vo.PageResult;
 import com.travelplatform.order.dto.admin.AdminOrderStatusUpdateRequest;
 import com.travelplatform.order.entity.Order;
+import com.travelplatform.order.integration.ProductSnapshotClient;
 import com.travelplatform.order.mapper.OrderMapper;
 import com.travelplatform.order.service.admin.AdminOrderManageService;
 import com.travelplatform.order.vo.admin.AdminOrderDetailVO;
@@ -26,9 +27,11 @@ import org.springframework.util.StringUtils;
 public class AdminOrderManageServiceImpl implements AdminOrderManageService {
 
     private final OrderMapper orderMapper;
+    private final ProductSnapshotClient productClient;
 
-    public AdminOrderManageServiceImpl(OrderMapper orderMapper) {
+    public AdminOrderManageServiceImpl(OrderMapper orderMapper, ProductSnapshotClient productClient) {
         this.orderMapper = orderMapper;
+        this.productClient = productClient;
     }
 
     @Override
@@ -89,12 +92,18 @@ public class AdminOrderManageServiceImpl implements AdminOrderManageService {
                 OrderStatusConstant.COMPLETED, OrderStatusConstant.CANCELLED, OrderStatusConstant.REFUNDED).contains(targetStatus)) {
             throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "订单状态不合法");
         }
-        if (order.getOrderStatus() == OrderStatusConstant.CANCELLED && targetStatus != OrderStatusConstant.CANCELLED) {
-            throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "已取消订单不支持恢复");
+        if (List.of(OrderStatusConstant.CANCELLED, OrderStatusConstant.REFUNDED).contains(order.getOrderStatus())
+                && !order.getOrderStatus().equals(targetStatus)) {
+            throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "已取消或已退款订单不支持再次变更状态");
         }
+        int previousStatus = order.getOrderStatus();
         order.setOrderStatus(targetStatus);
         order.setUpdatedAt(LocalDateTime.now());
         orderMapper.updateById(order);
+        if (previousStatus != targetStatus
+                && List.of(OrderStatusConstant.CANCELLED, OrderStatusConstant.REFUNDED).contains(targetStatus)) {
+            restoreStock(order);
+        }
     }
 
     @Override
@@ -110,6 +119,7 @@ public class AdminOrderManageServiceImpl implements AdminOrderManageService {
         order.setOrderStatus(OrderStatusConstant.CANCELLED);
         order.setUpdatedAt(LocalDateTime.now());
         orderMapper.updateById(order);
+        restoreStock(order);
     }
 
     private AdminOrderListItemVO toListVO(Order order) {
@@ -162,6 +172,12 @@ public class AdminOrderManageServiceImpl implements AdminOrderManageService {
             throw new BusinessException(ResultCode.NOT_FOUND.getCode(), "订单不存在");
         }
         return order;
+    }
+
+    private void restoreStock(Order order) {
+        int quantity = order.getQuantity() == null ? 1 : order.getQuantity();
+        productClient.restoreStock(order.getBizType(), order.getBizId(), order.getVariantId(),
+                order.getVariantName(), quantity);
     }
 
     private <T> PageResult<T> pageResult(IPage<?> source, List<T> records) {

@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS orders (
     user_id BIGINT NOT NULL,
     biz_type VARCHAR(20) NOT NULL,
     biz_id BIGINT NOT NULL,
+    variant_id BIGINT,
+    variant_name VARCHAR(100),
     product_name VARCHAR(160) NOT NULL,
     product_summary VARCHAR(500),
     unit_price DECIMAL(12, 2) NOT NULL,

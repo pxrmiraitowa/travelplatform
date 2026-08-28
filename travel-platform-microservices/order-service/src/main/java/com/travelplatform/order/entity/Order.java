@@ -16,6 +16,8 @@ public class Order {
     private Long userId;
     private String bizType;
     private Long bizId;
+    private Long variantId;
+    private String variantName;
     private String productName;
     private String productSummary;
     private BigDecimal unitPrice;
@@ -47,6 +49,10 @@ public class Order {
     public void setBizType(String bizType) { this.bizType = bizType; }
     public Long getBizId() { return bizId; }
     public void setBizId(Long bizId) { this.bizId = bizId; }
+    public Long getVariantId() { return variantId; }
+    public void setVariantId(Long variantId) { this.variantId = variantId; }
+    public String getVariantName() { return variantName; }
+    public void setVariantName(String variantName) { this.variantName = variantName; }
     public String getProductName() { return productName; }
     public void setProductName(String productName) { this.productName = productName; }
     public String getProductSummary() { return productSummary; }

@@ -9,6 +9,12 @@ on:
     branches:
       - dev
   workflow_dispatch:
+    inputs:
+      run_failure_drill:
+        description: Inject and diagnose an image-pull deployment failure, then restore it
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -416,6 +422,9 @@ jobs:
       - name: Run Kubernetes health checks
         run: bash scripts/health-check.sh | tee artifacts/kubernetes-health-check.log
 
+      - name: Verify database table ownership
+        run: bash scripts/verify-table-ownership.sh | tee artifacts/database-table-ownership.log
+
       - name: Run deployed API and business E2E regression tests
         working-directory: travel-platform-web
         env:
@@ -458,6 +467,10 @@ jobs:
           done
 
           npm run test:regression | tee ../artifacts/deployed-regression.log
+
+      - name: Run optional deployment failure drill
+        if: github.event_name == 'workflow_dispatch' && inputs.run_failure_drill
+        run: bash scripts/failure-drill.sh | tee artifacts/deployment-failure-drill.log
 
       - name: Collect Docker and Kubernetes diagnostics
         if: always()

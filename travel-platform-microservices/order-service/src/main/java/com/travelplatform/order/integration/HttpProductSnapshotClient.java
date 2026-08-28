@@ -6,7 +6,9 @@ import com.travelplatform.common.exception.BusinessException;
 import com.travelplatform.common.result.ResultCode;
 import com.travelplatform.order.dto.OrderCreateRequest;
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -90,6 +92,43 @@ public class HttpProductSnapshotClient implements ProductSnapshotClient {
             throw new BusinessException(ResultCode.SYSTEM_ERROR.getCode(), "优惠券服务暂不可用，请稍后重试");
         } catch (RestClientException exception) {
             throw new BusinessException(ResultCode.SYSTEM_ERROR.getCode(), "优惠券服务暂不可用，请稍后重试");
+        }
+    }
+
+    @Override
+    public void deductStock(String productType, Long productId, Long variantId, String variantName, int quantity) {
+        changeStock("/api/internal/products/stock/deduct", productType, productId, variantId, variantName, quantity,
+                "库存扣减失败");
+    }
+
+    @Override
+    public void restoreStock(String productType, Long productId, Long variantId, String variantName, int quantity) {
+        changeStock("/api/internal/products/stock/restore", productType, productId, variantId, variantName, quantity,
+                "库存恢复失败");
+    }
+
+    private void changeStock(String path, String productType, Long productId, Long variantId, String variantName,
+                             int quantity, String fallback) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("productType", productType);
+        body.put("productId", productId);
+        if (variantId != null) body.put("variantId", variantId);
+        if (StringUtils.hasText(variantName)) body.put("variantName", variantName);
+        body.put("quantity", quantity);
+        try {
+            JsonNode response = restClient.post().uri(path).body(body).retrieve().body(JsonNode.class);
+            if (response == null || response.path("code").asInt() != 200) {
+                throw badRequest(response == null ? fallback : response.path("message").asText(fallback));
+            }
+        } catch (BusinessException exception) {
+            throw exception;
+        } catch (RestClientResponseException exception) {
+            if (exception.getStatusCode().is4xxClientError()) {
+                throw badRequest(errorMessage(exception, fallback));
+            }
+            throw new BusinessException(ResultCode.SYSTEM_ERROR.getCode(), fallback + "，商品服务暂不可用");
+        } catch (RestClientException exception) {
+            throw new BusinessException(ResultCode.SYSTEM_ERROR.getCode(), fallback + "，商品服务暂不可用");
         }
     }
 

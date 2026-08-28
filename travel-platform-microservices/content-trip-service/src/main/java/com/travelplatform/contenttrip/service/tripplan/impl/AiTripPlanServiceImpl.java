@@ -1,18 +1,17 @@
 package com.travelplatform.contenttrip.service.tripplan.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.travelplatform.common.exception.BusinessException;
 import com.travelplatform.common.result.ResultCode;
 import com.travelplatform.contenttrip.dto.tripplan.AiTripPlanPreviewRequest;
 import com.travelplatform.contenttrip.dto.tripplan.AiTripPlanSaveDayRequest;
 import com.travelplatform.contenttrip.dto.tripplan.AiTripPlanSaveRequest;
-import com.travelplatform.contenttrip.entity.Attraction;
 import com.travelplatform.contenttrip.entity.TripPlan;
 import com.travelplatform.contenttrip.entity.TripPlanItem;
-import com.travelplatform.contenttrip.mapper.AttractionMapper;
 import com.travelplatform.contenttrip.mapper.TripPlanItemMapper;
 import com.travelplatform.contenttrip.mapper.TripPlanMapper;
 import com.travelplatform.contenttrip.security.CurrentUserProvider;
+import com.travelplatform.contenttrip.service.product.AttractionCatalogClient;
+import com.travelplatform.contenttrip.service.product.AttractionSnapshot;
 import com.travelplatform.contenttrip.service.tripplan.AiTripPlanService;
 import com.travelplatform.contenttrip.vo.tripplan.AiTripPlanAttractionVO;
 import com.travelplatform.contenttrip.vo.tripplan.AiTripPlanPreviewDayVO;
@@ -44,16 +43,16 @@ public class AiTripPlanServiceImpl implements AiTripPlanService {
     private static final int MAX_ATTRACTIONS_PER_DAY = 5;
     private static final Map<String, List<String>> PREFERENCE_KEYWORDS = buildPreferenceKeywords();
 
-    private final AttractionMapper attractionMapper;
+    private final AttractionCatalogClient attractionCatalogClient;
     private final TripPlanMapper tripPlanMapper;
     private final TripPlanItemMapper tripPlanItemMapper;
     private final CurrentUserProvider currentUserProvider;
 
-    public AiTripPlanServiceImpl(AttractionMapper attractionMapper,
+    public AiTripPlanServiceImpl(AttractionCatalogClient attractionCatalogClient,
                                  TripPlanMapper tripPlanMapper,
                                  TripPlanItemMapper tripPlanItemMapper,
                                  CurrentUserProvider currentUserProvider) {
-        this.attractionMapper = attractionMapper;
+        this.attractionCatalogClient = attractionCatalogClient;
         this.tripPlanMapper = tripPlanMapper;
         this.tripPlanItemMapper = tripPlanItemMapper;
         this.currentUserProvider = currentUserProvider;
@@ -63,7 +62,7 @@ public class AiTripPlanServiceImpl implements AiTripPlanService {
     public AiTripPlanPreviewVO buildPreview(AiTripPlanPreviewRequest request) {
         String destination = normalizeCity(request.getDestination());
         List<String> preferences = sanitizePreferences(request.getPreferences());
-        List<Attraction> candidates = loadCandidateAttractions(destination, preferences);
+        List<AttractionSnapshot> candidates = loadCandidateAttractions(destination, preferences);
         if (candidates.isEmpty()) {
             throw new BusinessException(ResultCode.NOT_FOUND.getCode(), "当前目的地暂无可用于规划的景点数据");
         }
@@ -100,10 +99,10 @@ public class AiTripPlanServiceImpl implements AiTripPlanService {
                 .flatMap(Collection::stream)
                 .distinct()
                 .toList();
-        Map<Long, Attraction> attractionMap = attractionIds.isEmpty()
+        Map<Long, AttractionSnapshot> attractionMap = attractionIds.isEmpty()
                 ? Map.of()
-                : attractionMapper.selectBatchIds(attractionIds).stream()
-                .collect(Collectors.toMap(Attraction::getId, attraction -> attraction));
+                : attractionCatalogClient.listByIds(attractionIds).stream()
+                .collect(Collectors.toMap(AttractionSnapshot::getId, attraction -> attraction));
 
         validateSaveDays(days, request.getTotalDays(), destination, attractionMap);
 
@@ -120,7 +119,7 @@ public class AiTripPlanServiceImpl implements AiTripPlanService {
         days.stream()
                 .sorted(Comparator.comparing(AiTripPlanSaveDayRequest::getDayNo))
                 .forEach(day -> {
-                    List<Attraction> dayAttractions = day.getAttractionIds().stream()
+                    List<AttractionSnapshot> dayAttractions = day.getAttractionIds().stream()
                             .map(attractionMap::get)
                             .filter(Objects::nonNull)
                             .toList();
@@ -147,13 +146,10 @@ public class AiTripPlanServiceImpl implements AiTripPlanService {
         return detail;
     }
 
-    private List<Attraction> loadCandidateAttractions(String destination, List<String> preferences) {
-        List<Attraction> allAttractions = attractionMapper.selectList(new LambdaQueryWrapper<Attraction>()
-                .eq(Attraction::getStatus, 1)
-                .orderByDesc(Attraction::getPriority)
-                .orderByAsc(Attraction::getId));
+    private List<AttractionSnapshot> loadCandidateAttractions(String destination, List<String> preferences) {
+        List<AttractionSnapshot> allAttractions = attractionCatalogClient.listByCity(destination);
 
-        List<Attraction> cityMatches = allAttractions.stream()
+        List<AttractionSnapshot> cityMatches = allAttractions.stream()
                 .filter(attraction -> normalizeCity(attraction.getCity()).equals(destination))
                 .toList();
         if (cityMatches.isEmpty()) {
@@ -164,14 +160,14 @@ public class AiTripPlanServiceImpl implements AiTripPlanService {
         }
 
         return cityMatches.stream()
-                .sorted(Comparator.comparingInt((Attraction attraction) -> scoreAttraction(attraction, preferences)).reversed()
-                        .thenComparing(Attraction::getPriority, Comparator.nullsLast(Comparator.reverseOrder()))
-                        .thenComparing(Attraction::getId))
+                .sorted(Comparator.comparingInt((AttractionSnapshot attraction) -> scoreAttraction(attraction, preferences)).reversed()
+                        .thenComparing(AttractionSnapshot::getPriority, Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(AttractionSnapshot::getId))
                 .limit(CANDIDATE_LIMIT)
                 .toList();
     }
 
-    private int scoreAttraction(Attraction attraction, List<String> preferences) {
+    private int scoreAttraction(AttractionSnapshot attraction, List<String> preferences) {
         int baseScore = attraction.getPriority() == null ? 0 : attraction.getPriority() * 10;
         if (preferences.isEmpty()) {
             return baseScore;
@@ -190,14 +186,14 @@ public class AiTripPlanServiceImpl implements AiTripPlanService {
         return baseScore + preferenceScore;
     }
 
-    private List<DayPlan> buildLocalPlan(List<Attraction> candidates, Integer totalDays, List<String> preferences) {
-        List<Attraction> ordered = new ArrayList<>(candidates);
+    private List<DayPlan> buildLocalPlan(List<AttractionSnapshot> candidates, Integer totalDays, List<String> preferences) {
+        List<AttractionSnapshot> ordered = new ArrayList<>(candidates);
         int dayCount = Math.max(1, totalDays == null ? 1 : totalDays);
         int perDay = Math.max(1, Math.min(MAX_ATTRACTIONS_PER_DAY, (int) Math.ceil((double) ordered.size() / dayCount)));
         List<DayPlan> dayPlans = new ArrayList<>();
         int cursor = 0;
         for (int dayNo = 1; dayNo <= dayCount; dayNo++) {
-            List<Attraction> dayAttractions = new ArrayList<>();
+            List<AttractionSnapshot> dayAttractions = new ArrayList<>();
             while (cursor < ordered.size() && dayAttractions.size() < perDay) {
                 dayAttractions.add(ordered.get(cursor));
                 cursor++;
@@ -213,7 +209,7 @@ public class AiTripPlanServiceImpl implements AiTripPlanService {
     private void validateSaveDays(List<AiTripPlanSaveDayRequest> days,
                                   Integer totalDays,
                                   String destination,
-                                  Map<Long, Attraction> attractionMap) {
+                                  Map<Long, AttractionSnapshot> attractionMap) {
         Set<Integer> dayNos = new HashSet<>();
         Set<Long> usedAttractionIds = new HashSet<>();
         for (AiTripPlanSaveDayRequest day : days) {
@@ -230,7 +226,7 @@ public class AiTripPlanServiceImpl implements AiTripPlanService {
                 if (!usedAttractionIds.add(attractionId)) {
                     throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "同一景点不能在多天重复保存");
                 }
-                Attraction attraction = attractionMap.get(attractionId);
+                AttractionSnapshot attraction = attractionMap.get(attractionId);
                 if (attraction == null || !Integer.valueOf(1).equals(attraction.getStatus())) {
                     throw new BusinessException(ResultCode.BAD_REQUEST.getCode(), "预览中的景点已失效，请重新生成");
                 }
@@ -250,7 +246,7 @@ public class AiTripPlanServiceImpl implements AiTripPlanService {
         return dayVO;
     }
 
-    private AiTripPlanAttractionVO toAttractionVO(Attraction attraction) {
+    private AiTripPlanAttractionVO toAttractionVO(AttractionSnapshot attraction) {
         AiTripPlanAttractionVO vo = new AiTripPlanAttractionVO();
         vo.setId(attraction.getId());
         vo.setCity(attraction.getCity());
@@ -274,7 +270,7 @@ public class AiTripPlanServiceImpl implements AiTripPlanService {
         return vo;
     }
 
-    private String buildFallbackReason(int dayNo, List<String> preferences, List<Attraction> attractions) {
+    private String buildFallbackReason(int dayNo, List<String> preferences, List<AttractionSnapshot> attractions) {
         String prefix = preferences.isEmpty()
                 ? "这一天优先安排当地代表性景点，便于快速建立整体印象。"
                 : "这一天围绕“" + String.join("、", preferences) + "”偏好挑选景点，兼顾代表性与游玩节奏。";
@@ -282,23 +278,23 @@ public class AiTripPlanServiceImpl implements AiTripPlanService {
             return prefix;
         }
         return "Day " + dayNo + "：" + prefix + " 推荐景点包括"
-                + attractions.stream().map(Attraction::getAttractionName).collect(Collectors.joining("、")) + "。";
+                + attractions.stream().map(AttractionSnapshot::getAttractionName).collect(Collectors.joining("、")) + "。";
     }
 
-    private String buildDayDestination(List<Attraction> attractions) {
+    private String buildDayDestination(List<AttractionSnapshot> attractions) {
         if (attractions.isEmpty()) {
             return "待定";
         }
-        Attraction first = attractions.get(0);
+        AttractionSnapshot first = attractions.get(0);
         if (StringUtils.hasText(first.getDistrict())) {
             return first.getDistrict() + "片区";
         }
         return first.getAttractionName();
     }
 
-    private String buildItemRemark(List<Attraction> attractions, String reason) {
+    private String buildItemRemark(List<AttractionSnapshot> attractions, String reason) {
         String attractionSummary = attractions.stream()
-                .map(Attraction::getAttractionName)
+                .map(AttractionSnapshot::getAttractionName)
                 .collect(Collectors.joining("、"));
         StringBuilder builder = new StringBuilder();
         builder.append("推荐景点：").append(attractionSummary);
@@ -382,6 +378,6 @@ public class AiTripPlanServiceImpl implements AiTripPlanService {
         return mapping;
     }
 
-    private record DayPlan(Integer dayNo, List<Attraction> attractions, String reason) {
+    private record DayPlan(Integer dayNo, List<AttractionSnapshot> attractions, String reason) {
     }
 }

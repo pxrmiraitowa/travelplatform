@@ -23,11 +23,14 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class OrderServiceImpl implements OrderService {
+    private static final Logger LOGGER = LoggerFactory.getLogger(OrderServiceImpl.class);
     private static final DateTimeFormatter ORDER_TIME = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
     private final OrderMapper orderMapper;
     private final ProductSnapshotClient productClient;
@@ -54,6 +57,8 @@ public class OrderServiceImpl implements OrderService {
         order.setUserId(userId);
         order.setBizType(productType);
         order.setBizId(request.getProductId());
+        order.setVariantId(request.getVariantId());
+        order.setVariantName(request.getVariantName());
         order.setProductName(snapshot.productName());
         order.setProductSummary(snapshot.summary());
         order.setUnitPrice(snapshot.price());
@@ -69,7 +74,20 @@ public class OrderServiceImpl implements OrderService {
         order.setContactPhone(request.getContactPhone().trim());
         order.setCreatedAt(now);
         order.setUpdatedAt(now);
-        orderMapper.insert(order);
+        productClient.deductStock(productType, request.getProductId(), request.getVariantId(), request.getVariantName(), quantity);
+        try {
+            orderMapper.insert(order);
+        } catch (RuntimeException exception) {
+            try {
+                productClient.restoreStock(productType, request.getProductId(), request.getVariantId(),
+                        request.getVariantName(), quantity);
+            } catch (RuntimeException compensationFailure) {
+                LOGGER.error("Order creation and stock compensation both failed: productType={}, productId={}, quantity={}",
+                        productType, request.getProductId(), quantity, compensationFailure);
+                exception.addSuppressed(compensationFailure);
+            }
+            throw exception;
+        }
         return OrderVO.from(order);
     }
 
@@ -103,6 +121,7 @@ public class OrderServiceImpl implements OrderService {
         requireStatus(order, OrderStatusConstant.PENDING_PAYMENT, "只有待支付订单可以取消，已支付订单请申请退款");
         order.setOrderStatus(OrderStatusConstant.CANCELLED);
         update(order);
+        restoreStock(order);
         return OrderVO.from(order);
     }
 
@@ -115,6 +134,7 @@ public class OrderServiceImpl implements OrderService {
         order.setRefundReason(request.getReason().trim());
         order.setRefundedAt(LocalDateTime.now());
         update(order);
+        restoreStock(order);
         return OrderVO.from(order);
     }
 
@@ -155,6 +175,11 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private void update(Order order) { order.setUpdatedAt(LocalDateTime.now()); orderMapper.updateById(order); }
+    private void restoreStock(Order order) {
+        int quantity = order.getQuantity() == null ? 1 : order.getQuantity();
+        productClient.restoreStock(order.getBizType(), order.getBizId(), order.getVariantId(),
+                order.getVariantName(), quantity);
+    }
     private void requireStatus(Order order, int expected, String message) {
         if (order.getOrderStatus() != expected) throw badRequest(message);
     }

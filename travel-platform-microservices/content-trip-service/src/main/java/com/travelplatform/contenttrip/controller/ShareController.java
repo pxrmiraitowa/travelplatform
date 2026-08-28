@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -58,5 +59,12 @@ public class ShareController {
     @GetMapping("/api/public/shares/{id}")
     public Result<SharePostDetailVO> getPublicShareDetail(@PathVariable Long id) {
         return Result.success(shareService.getPublicShareDetail(id));
+    }
+
+    @Operation(summary = "删除自己的分享")
+    @DeleteMapping("/api/shares/{id}")
+    public Result<Void> deleteCurrentUserShare(@PathVariable Long id) {
+        shareService.deleteCurrentUserShare(id);
+        return Result.success();
     }
 }
