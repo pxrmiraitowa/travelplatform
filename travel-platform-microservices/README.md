@@ -60,6 +60,24 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-gateway.ps1
 
 The smoke test uses `demo_user / 123456` and `admin / 123456` by default.
 
+## Containerization and CI/CD
+
+The GitHub Actions workflow at `.github/workflows/ci-cd.yml` runs for pushes to
+`dev` and `codex/**`, pull requests targeting `dev`, and manual dispatches.
+
+The pipeline performs the following stages:
+
+1. Builds the microservice reactor and frontend.
+2. Runs backend and frontend unit tests and uploads test evidence.
+3. Builds and pushes versioned images for the four business services, gateway,
+   and frontend to GitHub Container Registry.
+4. Creates an isolated Kind cluster, initializes MySQL, deploys all components,
+   checks their health, and runs the frontend API regression suite.
+5. Uploads Kubernetes diagnostics when deployment verification fails.
+
+Image publishing and deployment are skipped for pull requests. Push builds use
+both an immutable `sha-<commit>` tag and a readable `0.1.<run-number>` tag.
+
 ## Next Migration Order
 
 1. Move shared response, constants, and exceptions into `common-lib`.

@@ -5,8 +5,10 @@ WORKDIR /workspace
 
 COPY . .
 
-RUN test -n "$SERVICE_NAME" \
-    && mvn -B -pl "$SERVICE_NAME" -am clean package -DskipTests \
+RUN --mount=type=cache,target=/root/.m2 \
+    test -n "$SERVICE_NAME" \
+    && mvn -B -Dmaven.wagon.http.retryHandler.count=5 \
+        -pl "$SERVICE_NAME" -am clean package -DskipTests \
     && cp "$SERVICE_NAME"/target/*.jar /tmp/app.jar
 
 FROM eclipse-temurin:17-jre-alpine

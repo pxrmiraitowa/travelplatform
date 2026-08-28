@@ -1,0 +1,55 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-init
+  namespace: travel-platform
+  labels:
+    app.kubernetes.io/name: db-init
+    app.kubernetes.io/part-of: travel-platform-microservices
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: db-init
+        app.kubernetes.io/part-of: travel-platform-microservices
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: db-init
+          image: maven:3.9-eclipse-temurin-17
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MYSQL_URL
+              value: jdbc:mysql://mysql:3306/?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+            - name: MYSQL_USERNAME
+              value: root
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: travel-platform-secrets
+                  key: mysql-root-password
+          command:
+            - bash
+            - -lc
+            - |
+              set -Eeuo pipefail
+              JDBC_JAR="/root/.m2/repository/com/mysql/mysql-connector-j/8.3.0/mysql-connector-j-8.3.0.jar"
+              if [ ! -f "${JDBC_JAR}" ]; then
+                mvn -q org.apache.maven.plugins:maven-dependency-plugin:3.6.1:get \
+                  -Dartifact=com.mysql:mysql-connector-j:8.3.0 \
+                  -Dtransitive=true
+              fi
+              mkdir -p /tmp/sql-runner
+              javac -encoding UTF-8 -cp "${JDBC_JAR}" -d /tmp/sql-runner /config/SqlRunner.java
+              java -cp "/tmp/sql-runner:${JDBC_JAR}" SqlRunner \
+                "${MYSQL_URL}" "${MYSQL_USERNAME}" "${MYSQL_PASSWORD}" \
+                /config/schema.sql /config/data-demo.sql
+          volumeMounts:
+            - name: db-init-config
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: db-init-config
+          configMap:
+            name: travel-platform-db-init

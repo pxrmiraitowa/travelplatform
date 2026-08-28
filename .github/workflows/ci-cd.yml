@@ -1,0 +1,503 @@
+name: Microservices CI/CD - GitHub Actions, GHCR and Kind
+
+on:
+  push:
+    branches:
+      - dev
+      - "codex/**"
+  pull_request:
+    branches:
+      - dev
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: travel-platform-microservices-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CI_DB_PASSWORD: travel-platform-ci-db-password
+  CI_JWT_SECRET: travel-platform-ci-jwt-secret-for-microservices-2026
+  KIND_CLUSTER_NAME: travel-platform-microservices-ci
+  MYSQL_SOURCE_IMAGE: mysql:8.4@sha256:1d6b6a8fcee8ff758ff151d017f5203cd06792a0e698f0a593c9dfcb14609cf0
+  MYSQL_KIND_IMAGE: mysql:8.4-kind-amd64
+
+jobs:
+  build:
+    name: 1. Compile
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v7
+
+      - name: Prepare evidence directory
+        run: mkdir -p artifacts
+
+      - name: Set up JDK 17 and Maven cache
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+          cache-dependency-path: travel-platform-microservices/pom.xml
+
+      - name: Set up Node.js 22 and npm cache
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: travel-platform-web/package-lock.json
+
+      - name: Install microservice dependencies
+        working-directory: travel-platform-microservices
+        run: mvn -B dependency:go-offline | tee ../artifacts/microservices-dependencies.log
+
+      - name: Install frontend dependencies
+        working-directory: travel-platform-web
+        run: npm ci | tee ../artifacts/frontend-dependencies.log
+
+      - name: Compile and package microservices
+        working-directory: travel-platform-microservices
+        run: mvn -B -DskipTests clean package | tee ../artifacts/microservices-build.log
+
+      - name: Compile frontend
+        working-directory: travel-platform-web
+        run: npm run build | tee ../artifacts/frontend-build.log
+
+      - name: Retain compiled artifacts and build logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: microservices-build-output-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            artifacts/**
+            travel-platform-microservices/*-service/target/*.jar
+            travel-platform-web/dist/**
+
+  microservice_unit_test:
+    name: 2. Microservice unit tests
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v7
+
+      - name: Prepare evidence directory
+        run: mkdir -p artifacts
+
+      - name: Set up JDK 17 and Maven cache
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+          cache-dependency-path: travel-platform-microservices/pom.xml
+
+      - name: Run microservice unit tests
+        working-directory: travel-platform-microservices
+        run: mvn -B -pl user-service,product-service,order-service,content-trip-service,gateway-service -am test | tee ../artifacts/microservices-unit-tests.log
+
+      - name: Retain microservice unit-test evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: microservices-unit-test-evidence-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            artifacts/**
+            travel-platform-microservices/*-service/target/surefire-reports/**
+
+  frontend_unit_test:
+    name: 3. Frontend unit tests
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v7
+
+      - name: Prepare evidence directory
+        run: mkdir -p artifacts
+
+      - name: Set up Node.js 22 and npm cache
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: travel-platform-web/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: travel-platform-web
+        run: npm ci | tee ../artifacts/frontend-dependencies.log
+
+      - name: Run frontend unit tests
+        working-directory: travel-platform-web
+        run: npm run test:unit | tee ../artifacts/frontend-unit-tests.log
+
+      - name: Retain frontend unit-test evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-unit-test-evidence-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: artifacts/**
+
+  build_images:
+    name: 4. Build and push images
+    if: github.event_name != 'pull_request'
+    needs:
+      - microservice_unit_test
+      - frontend_unit_test
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_prefix: ${{ steps.image_metadata.outputs.image_prefix }}
+      image_tag: ${{ steps.image_metadata.outputs.image_tag }}
+      release_tag: ${{ steps.image_metadata.outputs.release_tag }}
+      user_digest: ${{ steps.build_user.outputs.digest }}
+      product_digest: ${{ steps.build_product.outputs.digest }}
+      order_digest: ${{ steps.build_order.outputs.digest }}
+      content_trip_digest: ${{ steps.build_content_trip.outputs.digest }}
+      gateway_digest: ${{ steps.build_gateway.outputs.digest }}
+      frontend_digest: ${{ steps.build_frontend.outputs.digest }}
+
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v7
+
+      - name: Prepare evidence directory
+        run: mkdir -p artifacts
+
+      - name: Prepare versioned image names
+        id: image_metadata
+        shell: bash
+        run: |
+          owner_lower="${GITHUB_REPOSITORY_OWNER,,}"
+          short_sha="${GITHUB_SHA::12}"
+          image_prefix="ghcr.io/${owner_lower}/travel-platform"
+          image_tag="sha-${short_sha}"
+          release_tag="0.1.${GITHUB_RUN_NUMBER}"
+
+          {
+            echo "image_prefix=${image_prefix}"
+            echo "image_tag=${image_tag}"
+            echo "release_tag=${release_tag}"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "IMAGE_PREFIX=${image_prefix}"
+            echo "IMAGE_TAG=${image_tag}"
+            echo "RELEASE_TAG=${release_tag}"
+          } >> "$GITHUB_ENV"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build and push user-service image
+        id: build_user
+        uses: docker/build-push-action@v7
+        with:
+          context: ./travel-platform-microservices
+          file: ./travel-platform-microservices/Dockerfile
+          push: true
+          provenance: false
+          build-args: SERVICE_NAME=user-service
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-user-service:${{ env.IMAGE_TAG }}
+            ${{ env.IMAGE_PREFIX }}-user-service:${{ env.RELEASE_TAG }}
+          cache-from: type=gha,scope=user-service
+          cache-to: type=gha,mode=max,scope=user-service
+
+      - name: Build and push product-service image
+        id: build_product
+        uses: docker/build-push-action@v7
+        with:
+          context: ./travel-platform-microservices
+          file: ./travel-platform-microservices/Dockerfile
+          push: true
+          provenance: false
+          build-args: SERVICE_NAME=product-service
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-product-service:${{ env.IMAGE_TAG }}
+            ${{ env.IMAGE_PREFIX }}-product-service:${{ env.RELEASE_TAG }}
+          cache-from: type=gha,scope=product-service
+          cache-to: type=gha,mode=max,scope=product-service
+
+      - name: Build and push order-service image
+        id: build_order
+        uses: docker/build-push-action@v7
+        with:
+          context: ./travel-platform-microservices
+          file: ./travel-platform-microservices/Dockerfile
+          push: true
+          provenance: false
+          build-args: SERVICE_NAME=order-service
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-order-service:${{ env.IMAGE_TAG }}
+            ${{ env.IMAGE_PREFIX }}-order-service:${{ env.RELEASE_TAG }}
+          cache-from: type=gha,scope=order-service
+          cache-to: type=gha,mode=max,scope=order-service
+
+      - name: Build and push content-trip-service image
+        id: build_content_trip
+        uses: docker/build-push-action@v7
+        with:
+          context: ./travel-platform-microservices
+          file: ./travel-platform-microservices/Dockerfile
+          push: true
+          provenance: false
+          build-args: SERVICE_NAME=content-trip-service
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-content-trip-service:${{ env.IMAGE_TAG }}
+            ${{ env.IMAGE_PREFIX }}-content-trip-service:${{ env.RELEASE_TAG }}
+          cache-from: type=gha,scope=content-trip-service
+          cache-to: type=gha,mode=max,scope=content-trip-service
+
+      - name: Build and push gateway-service image
+        id: build_gateway
+        uses: docker/build-push-action@v7
+        with:
+          context: ./travel-platform-microservices
+          file: ./travel-platform-microservices/Dockerfile
+          push: true
+          provenance: false
+          build-args: SERVICE_NAME=gateway-service
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-gateway-service:${{ env.IMAGE_TAG }}
+            ${{ env.IMAGE_PREFIX }}-gateway-service:${{ env.RELEASE_TAG }}
+          cache-from: type=gha,scope=gateway-service
+          cache-to: type=gha,mode=max,scope=gateway-service
+
+      - name: Build and push frontend image
+        id: build_frontend
+        uses: docker/build-push-action@v7
+        with:
+          context: ./travel-platform-web
+          file: ./travel-platform-web/Dockerfile
+          push: true
+          provenance: false
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-web:${{ env.IMAGE_TAG }}
+            ${{ env.IMAGE_PREFIX }}-web:${{ env.RELEASE_TAG }}
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+      - name: Record pushed image versions
+        shell: bash
+        run: |
+          {
+            for service in user-service product-service order-service content-trip-service gateway-service web; do
+              echo "${service}_image=${IMAGE_PREFIX}-${service}:${IMAGE_TAG}"
+              echo "${service}_release=${IMAGE_PREFIX}-${service}:${RELEASE_TAG}"
+            done
+            echo "user_digest=${{ steps.build_user.outputs.digest }}"
+            echo "product_digest=${{ steps.build_product.outputs.digest }}"
+            echo "order_digest=${{ steps.build_order.outputs.digest }}"
+            echo "content_trip_digest=${{ steps.build_content_trip.outputs.digest }}"
+            echo "gateway_digest=${{ steps.build_gateway.outputs.digest }}"
+            echo "frontend_digest=${{ steps.build_frontend.outputs.digest }}"
+          } | tee artifacts/image-versions.log
+
+      - name: Save image-build result
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "repository=${GITHUB_REPOSITORY}"
+            echo "branch=${GITHUB_REF_NAME}"
+            echo "commit=${GITHUB_SHA}"
+            echo "run_id=${GITHUB_RUN_ID}"
+            echo "run_number=${GITHUB_RUN_NUMBER}"
+            echo "result=${{ job.status }}"
+          } > artifacts/run-summary.txt
+
+      - name: Retain image-build evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: microservices-image-build-evidence-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: artifacts/**
+
+  deploy_and_health_check:
+    name: 5. Deploy and health check
+    needs: build_images
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: read
+    env:
+      IMAGE_PREFIX: ${{ needs.build_images.outputs.image_prefix }}
+      IMAGE_TAG: ${{ needs.build_images.outputs.image_tag }}
+
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v7
+
+      - name: Prepare evidence directory
+        run: mkdir -p artifacts
+
+      - name: Set up Node.js 22 and npm cache
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: travel-platform-web/package-lock.json
+
+      - name: Install regression-test dependencies
+        working-directory: travel-platform-web
+        run: npm ci | tee ../artifacts/frontend-regression-dependencies.log
+
+      - name: Log in to GHCR for deployment
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Kind v0.32.0
+        shell: bash
+        run: |
+          curl --fail --location --retry 3 \
+            --output kind https://kind.sigs.k8s.io/dl/v0.32.0/kind-linux-amd64
+          chmod +x kind
+          sudo install kind /usr/local/bin/kind
+          kind version | tee artifacts/kind-version.log
+          kubectl version --client | tee artifacts/kubectl-version.log
+
+      - name: Create Kind cluster
+        run: >-
+          kind create cluster
+          --name "${KIND_CLUSTER_NAME}"
+          --config deploy/kind/cluster.yaml
+          --wait 180s
+
+      - name: Pull and load deployment images into Kind
+        shell: bash
+        run: |
+          docker pull "${MYSQL_SOURCE_IMAGE}"
+          docker tag "${MYSQL_SOURCE_IMAGE}" "${MYSQL_KIND_IMAGE}"
+
+          for service in user-service product-service order-service content-trip-service gateway-service web; do
+            docker pull "${IMAGE_PREFIX}-${service}:${IMAGE_TAG}" | tee "artifacts/${service}-image-pull.log"
+            kind load docker-image "${IMAGE_PREFIX}-${service}:${IMAGE_TAG}" --name "${KIND_CLUSTER_NAME}"
+          done
+          kind load docker-image "${MYSQL_KIND_IMAGE}" --name "${KIND_CLUSTER_NAME}"
+
+      - name: Deploy microservices to Kubernetes
+        env:
+          MYSQL_ROOT_PASSWORD: ${{ env.CI_DB_PASSWORD }}
+          JWT_SECRET: ${{ env.CI_JWT_SECRET }}
+        run: bash scripts/deploy-kind.sh | tee artifacts/kubernetes-deploy.log
+
+      - name: Run Kubernetes health checks
+        run: bash scripts/health-check.sh | tee artifacts/kubernetes-health-check.log
+
+      - name: Run deployed API regression tests
+        working-directory: travel-platform-web
+        env:
+          API_BASE_URL: http://127.0.0.1:18080/api
+        shell: bash
+        run: |
+          pids=()
+          cleanup() {
+            for pid in "${pids[@]}"; do
+              kill "${pid}" 2>/dev/null || true
+            done
+          }
+          trap cleanup EXIT
+
+          for service_port in \
+            gateway-service:8000 \
+            user-service:8101 \
+            product-service:8102 \
+            order-service:8103 \
+            content-trip-service:8104; do
+            service_name="${service_port%%:*}"
+            port="${service_port##*:}"
+            kubectl --namespace travel-platform port-forward \
+              "service/${service_name}" "${port}:${port}" \
+              > "../artifacts/${service_name}-port-forward.log" 2>&1 &
+            pids+=("$!")
+          done
+
+          for port in 8000 8101 8102 8103 8104; do
+            for attempt in {1..30}; do
+              if curl --fail --silent "http://127.0.0.1:${port}/api/public/health" > /dev/null; then
+                break
+              fi
+              if [[ "${attempt}" == "30" ]]; then
+                echo "Port forward on ${port} did not become ready." >&2
+                exit 1
+              fi
+              sleep 1
+            done
+          done
+
+          npm run test:api | tee ../artifacts/deployed-api-regression.log
+
+      - name: Collect Docker and Kubernetes diagnostics
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          docker ps -a > artifacts/docker-containers.txt 2>&1 || true
+          bash scripts/collect-k8s-logs.sh artifacts/k8s || true
+
+      - name: Save deployment result
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "repository=${GITHUB_REPOSITORY}"
+            echo "branch=${GITHUB_REF_NAME}"
+            echo "commit=${GITHUB_SHA}"
+            echo "run_id=${GITHUB_RUN_ID}"
+            echo "run_number=${GITHUB_RUN_NUMBER}"
+            echo "result=${{ job.status }}"
+            echo "image_tag=${IMAGE_TAG}"
+            echo "user_service=${IMAGE_PREFIX}-user-service:${IMAGE_TAG}"
+            echo "product_service=${IMAGE_PREFIX}-product-service:${IMAGE_TAG}"
+            echo "order_service=${IMAGE_PREFIX}-order-service:${IMAGE_TAG}"
+            echo "content_trip_service=${IMAGE_PREFIX}-content-trip-service:${IMAGE_TAG}"
+            echo "gateway_service=${IMAGE_PREFIX}-gateway-service:${IMAGE_TAG}"
+            echo "frontend=${IMAGE_PREFIX}-web:${IMAGE_TAG}"
+            echo "user_digest=${{ needs.build_images.outputs.user_digest }}"
+            echo "product_digest=${{ needs.build_images.outputs.product_digest }}"
+            echo "order_digest=${{ needs.build_images.outputs.order_digest }}"
+            echo "content_trip_digest=${{ needs.build_images.outputs.content_trip_digest }}"
+            echo "gateway_digest=${{ needs.build_images.outputs.gateway_digest }}"
+            echo "frontend_digest=${{ needs.build_images.outputs.frontend_digest }}"
+          } > artifacts/run-summary.txt
+
+      - name: Retain deployment and health-check evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: microservices-deployment-evidence-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: artifacts/**
