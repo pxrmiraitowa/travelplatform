@@ -1,0 +1,199 @@
+name: ${COMPOSE_PROJECT_NAME:-travel-platform-microservices}
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-travel-platform-local-db-password}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "${MYSQL_PORT:-3307}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - travel-network
+
+  db-init:
+    image: maven:3.9-eclipse-temurin-17
+    working_dir: /workspace/travel-platform-microservices
+    environment:
+      MYSQL_URL: jdbc:mysql://mysql:3306/?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+      MYSQL_USERNAME: root
+      MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:-travel-platform-local-db-password}
+    volumes:
+      - .:/workspace
+      - maven_repo:/root/.m2
+    command: ["bash", "./scripts/init-local-databases.sh"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - travel-network
+
+  user-service:
+    image: travel-platform-user-service:${IMAGE_TAG:-0.1.0}
+    build:
+      context: ./travel-platform-microservices
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: user-service
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/travel_user?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-travel-platform-local-db-password}
+      JWT_SECRET: ${JWT_SECRET:-travel-platform-local-jwt-secret-change-before-deploy-2026}
+      SERVER_PORT: 8101
+      TZ: Asia/Shanghai
+    ports:
+      - "${USER_SERVICE_PORT:-8101}:8101"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    networks:
+      - travel-network
+
+  product-service:
+    image: travel-platform-product-service:${IMAGE_TAG:-0.1.0}
+    build:
+      context: ./travel-platform-microservices
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: product-service
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/travel_product?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-travel-platform-local-db-password}
+      SERVER_PORT: 8102
+      TZ: Asia/Shanghai
+    ports:
+      - "${PRODUCT_SERVICE_PORT:-8102}:8102"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    networks:
+      - travel-network
+
+  order-service:
+    image: travel-platform-order-service:${IMAGE_TAG:-0.1.0}
+    build:
+      context: ./travel-platform-microservices
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: order-service
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/travel_order?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-travel-platform-local-db-password}
+      PRODUCT_SERVICE_URL: http://product-service:8102
+      SERVER_PORT: 8103
+      TZ: Asia/Shanghai
+    ports:
+      - "${ORDER_SERVICE_PORT:-8103}:8103"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      product-service:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - travel-network
+
+  content-trip-service:
+    image: travel-platform-content-trip-service:${IMAGE_TAG:-0.1.0}
+    build:
+      context: ./travel-platform-microservices
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: content-trip-service
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/travel_content_trip?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+      DB_USERNAME: root
+      DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-travel-platform-local-db-password}
+      USER_SERVICE_URL: http://user-service:8101
+      PRODUCT_SERVICE_URL: http://product-service:8102
+      ORDER_SERVICE_URL: http://order-service:8103
+      UPLOAD_DIR: /app/uploads
+      SERVER_PORT: 8104
+      TZ: Asia/Shanghai
+    ports:
+      - "${CONTENT_TRIP_SERVICE_PORT:-8104}:8104"
+    volumes:
+      - content_uploads:/app/uploads
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      user-service:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - travel-network
+
+  gateway-service:
+    image: travel-platform-gateway-service:${IMAGE_TAG:-0.1.0}
+    build:
+      context: ./travel-platform-microservices
+      dockerfile: Dockerfile
+      args:
+        SERVICE_NAME: gateway-service
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-travel-platform-local-jwt-secret-change-before-deploy-2026}
+      USER_SERVICE_URL: http://user-service:8101
+      PRODUCT_SERVICE_URL: http://product-service:8102
+      ORDER_SERVICE_URL: http://order-service:8103
+      CONTENT_TRIP_SERVICE_URL: http://content-trip-service:8104
+      SERVER_PORT: 8000
+      TZ: Asia/Shanghai
+    ports:
+      - "${GATEWAY_PORT:-8000}:8000"
+    depends_on:
+      user-service:
+        condition: service_healthy
+      product-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      content-trip-service:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - travel-network
+
+  frontend:
+    image: travel-platform-web:${IMAGE_TAG:-0.1.0}
+    build:
+      context: ./travel-platform-web
+      dockerfile: Dockerfile
+    ports:
+      - "${FRONTEND_PORT:-8088}:80"
+    depends_on:
+      gateway-service:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - travel-network
+
+volumes:
+  mysql_data:
+  maven_repo:
+  content_uploads:
+
+networks:
+  travel-network:
+    driver: bridge

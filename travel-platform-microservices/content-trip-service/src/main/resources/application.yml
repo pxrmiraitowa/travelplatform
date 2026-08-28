@@ -5,9 +5,9 @@ spring:
   application:
     name: content-trip-service
   datasource:
-    url: jdbc:mysql://localhost:3306/travel_content_trip?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
-    username: root
-    password: 123456
+    url: ${DB_URL:jdbc:mysql://localhost:3306/travel_content_trip?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:123456}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
 service:
@@ -35,4 +35,4 @@ springdoc:
     path: /swagger-ui.html
 
 travel:
-  upload-dir: ./uploads
+  upload-dir: ${UPLOAD_DIR:./uploads}
