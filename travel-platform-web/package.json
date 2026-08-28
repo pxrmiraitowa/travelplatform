@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test:unit": "vitest run"
+    "test:unit": "vitest run src",
+    "test:api": "vitest run regression/public-api.test.js --environment node --testTimeout 60000",
+    "test:e2e": "vitest run regression/business-e2e.test.js --environment node --testTimeout 120000",
+    "test:regression": "npm run test:api && npm run test:e2e"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
