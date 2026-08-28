@@ -416,10 +416,10 @@ jobs:
       - name: Run Kubernetes health checks
         run: bash scripts/health-check.sh | tee artifacts/kubernetes-health-check.log
 
-      - name: Run deployed API regression tests
+      - name: Run deployed API and business E2E regression tests
         working-directory: travel-platform-web
         env:
-          API_BASE_URL: http://127.0.0.1:18080/api
+          API_BASE_URL: http://127.0.0.1:8000/api
         shell: bash
         run: |
           pids=()
@@ -457,7 +457,7 @@ jobs:
             done
           done
 
-          npm run test:api | tee ../artifacts/deployed-api-regression.log
+          npm run test:regression | tee ../artifacts/deployed-regression.log
 
       - name: Collect Docker and Kubernetes diagnostics
         if: always()
