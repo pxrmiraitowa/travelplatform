@@ -4,6 +4,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -23,6 +24,8 @@ public class SqlRunner {
     private static final Set<String> ALL_TABLES = union(USER_TABLES, PRODUCT_TABLES, CONTENT_TABLES, ORDER_TABLES);
     private static final Pattern TABLE_COMMAND = Pattern.compile(
             "(?is)^(?:CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?|INSERT\\s+INTO\\s+|UPDATE\\s+|DELETE\\s+FROM\\s+)[`]?([a-zA-Z0-9_]+)[`]?.*");
+    private static final Pattern READ_TABLE_REFERENCE = Pattern.compile(
+            "(?i)\\b(?:FROM|JOIN)\\s+[`]?([a-zA-Z0-9_]+)[`]?");
 
     public static void main(String[] args) throws Exception {
         if (args.length != 5) {
@@ -112,18 +115,41 @@ public class SqlRunner {
                     INDEX idx_orders_biz (biz_type, biz_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='order table with product snapshot'
                 """);
-        execute(statement, "ALTER TABLE orders ADD COLUMN IF NOT EXISTS variant_id BIGINT AFTER biz_id");
-        execute(statement, "ALTER TABLE orders ADD COLUMN IF NOT EXISTS variant_name VARCHAR(100) AFTER variant_id");
+        addColumnIfMissing(statement, "travel_order", "orders", "variant_id", "BIGINT AFTER biz_id");
+        addColumnIfMissing(statement, "travel_order", "orders", "variant_name", "VARCHAR(100) AFTER variant_id");
         System.out.println("Initialized travel_order");
+    }
+
+    private static void addColumnIfMissing(Statement statement, String database, String table,
+                                           String column, String definition) throws SQLException {
+        String checkSql = "SELECT 1 FROM information_schema.columns WHERE table_schema='" + database
+                + "' AND table_name='" + table + "' AND column_name='" + column + "'";
+        try (ResultSet result = statement.executeQuery(checkSql)) {
+            if (result.next()) {
+                return;
+            }
+        }
+        execute(statement, "ALTER TABLE `" + table + "` ADD COLUMN `" + column + "` " + definition);
     }
 
     private static void runScript(Statement statement, String sql, Set<String> ownedTables) throws SQLException {
         for (String command : splitSql(sql)) {
             Matcher matcher = TABLE_COMMAND.matcher(command.trim());
-            if (matcher.matches() && ownedTables.contains(matcher.group(1).toLowerCase())) {
+            if (matcher.matches() && ownedTables.contains(matcher.group(1).toLowerCase())
+                    && readsOnlyOwnedTables(command, ownedTables)) {
                 execute(statement, command);
             }
         }
+    }
+
+    private static boolean readsOnlyOwnedTables(String command, Set<String> ownedTables) {
+        Matcher references = READ_TABLE_REFERENCE.matcher(command);
+        while (references.find()) {
+            if (!ownedTables.contains(references.group(1).toLowerCase())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @SafeVarargs
