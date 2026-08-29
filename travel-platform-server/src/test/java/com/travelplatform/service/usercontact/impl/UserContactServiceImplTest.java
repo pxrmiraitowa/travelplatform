@@ -1,6 +1,7 @@
 package com.travelplatform.service.usercontact.impl;
 
 import com.travelplatform.common.exception.BusinessException;
+import com.travelplatform.common.result.ResultCode;
 import com.travelplatform.dto.usercontact.UserContactCreateRequest;
 import com.travelplatform.dto.usercontact.UserContactUpdateRequest;
 import com.travelplatform.entity.UserContact;
@@ -67,7 +68,25 @@ class UserContactServiceImplTest {
             mocked.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
             when(mapper.selectById(3L)).thenReturn(contact(3L, 2L, "Other", 0));
 
-            assertThatThrownBy(() -> service.deleteContact(3L)).isInstanceOf(BusinessException.class);
+            assertThatThrownBy(() -> service.deleteContact(3L))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("code").isEqualTo(ResultCode.NOT_FOUND.getCode());
+        }
+    }
+
+    @Test
+    void updateContactShouldRejectAnotherUsersRecordAndAvoidWrite() {
+        try (MockedStatic<SecurityUtils> mocked = mockStatic(SecurityUtils.class)) {
+            mocked.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
+            when(mapper.selectById(3L)).thenReturn(contact(3L, 2L, "Other", 0));
+            UserContactUpdateRequest request = new UserContactUpdateRequest();
+            request.setName("Tampered");
+            request.setPhone("13900000001");
+
+            assertThatThrownBy(() -> service.updateContact(3L, request))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("code").isEqualTo(ResultCode.NOT_FOUND.getCode());
+            verify(mapper, org.mockito.Mockito.never()).updateById(any(UserContact.class));
         }
     }
 

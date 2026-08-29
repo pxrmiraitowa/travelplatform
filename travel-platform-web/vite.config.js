@@ -12,7 +12,9 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
-    clearMocks: true
+    clearMocks: true,
+    include: ['src/**/*.{test,spec}.{js,ts}'],
+    exclude: ['tests/e2e/**']
   },
   server: {
     port: 5173,
@@ -25,3 +27,4 @@ export default defineConfig({
     }
   }
 })
+

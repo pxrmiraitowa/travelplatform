@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.travelplatform.common.constant.OrderBizTypeConstant;
 import com.travelplatform.common.constant.OrderStatusConstant;
 import com.travelplatform.common.exception.BusinessException;
+import com.travelplatform.common.result.ResultCode;
 import com.travelplatform.dto.review.ReviewCreateRequest;
 import com.travelplatform.entity.OrderFlight;
 import com.travelplatform.entity.OrderHotel;
@@ -94,7 +95,11 @@ class ReviewServiceImplTest {
             request.setRating(5);
             request.setContent("Great");
 
-            assertThatThrownBy(() -> service.createReview(request)).isInstanceOf(BusinessException.class);
+            BusinessException error = org.assertj.core.api.Assertions.catchThrowableOfType(
+                    () -> service.createReview(request), BusinessException.class);
+
+            assertThat(error.getCode()).isEqualTo(ResultCode.BAD_REQUEST.getCode());
+            verify(reviewMapper, org.mockito.Mockito.never()).insert(any(Review.class));
         }
     }
 
@@ -111,7 +116,32 @@ class ReviewServiceImplTest {
             request.setRating(5);
             request.setContent("Great");
 
-            assertThatThrownBy(() -> service.createReview(request)).isInstanceOf(BusinessException.class);
+            BusinessException error = org.assertj.core.api.Assertions.catchThrowableOfType(
+                    () -> service.createReview(request), BusinessException.class);
+
+            assertThat(error.getCode()).isEqualTo(ResultCode.BAD_REQUEST.getCode());
+            verify(reviewMapper, org.mockito.Mockito.never()).insert(any(Review.class));
+        }
+    }
+
+    @Test
+    void createReviewShouldRejectOrderOwnedByAnotherUser() {
+        try (MockedStatic<SecurityUtils> mocked = mockStatic(SecurityUtils.class)) {
+            mocked.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
+            Orders order = completedOrder(1L, OrderBizTypeConstant.FLIGHT, 88L);
+            order.setUserId(2L);
+            when(ordersMapper.selectById(1L)).thenReturn(order);
+
+            ReviewCreateRequest request = new ReviewCreateRequest();
+            request.setOrderId(1L);
+            request.setRating(5);
+            request.setContent("Great");
+
+            BusinessException error = org.assertj.core.api.Assertions.catchThrowableOfType(
+                    () -> service.createReview(request), BusinessException.class);
+
+            assertThat(error.getCode()).isEqualTo(ResultCode.NOT_FOUND.getCode());
+            verify(reviewMapper, org.mockito.Mockito.never()).insert(any(Review.class));
         }
     }
 
