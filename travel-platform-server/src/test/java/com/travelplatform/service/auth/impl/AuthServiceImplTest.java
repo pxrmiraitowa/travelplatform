@@ -2,7 +2,6 @@ package com.travelplatform.service.auth.impl;
 
 import com.travelplatform.common.exception.BusinessException;
 import com.travelplatform.common.result.ResultCode;
-import com.travelplatform.common.result.ResultCode;
 import com.travelplatform.dto.auth.LoginRequest;
 import com.travelplatform.dto.auth.LoginResponse;
 import com.travelplatform.dto.auth.RegisterRequest;
@@ -140,36 +139,6 @@ class AuthServiceImplTest {
     }
 
     @Test
-    void registerShouldRejectDuplicateUsernameBeforeInsert() {
-        RegisterRequest request = validRegisterRequest();
-        User existing = new User();
-        existing.setId(9L);
-        when(userMapper.selectOne(any())).thenReturn(existing);
-
-        BusinessException error = org.assertj.core.api.Assertions.catchThrowableOfType(
-                () -> service.register(request), BusinessException.class);
-
-        assertThat(error.getCode()).isEqualTo(ResultCode.BAD_REQUEST.getCode());
-        assertThat(error).hasMessage("用户名已存在");
-        verify(userMapper, org.mockito.Mockito.never()).insert(any(User.class));
-    }
-
-    @Test
-    void registerShouldRejectDuplicatePhoneBeforeInsert() {
-        RegisterRequest request = validRegisterRequest();
-        User existing = new User();
-        existing.setId(10L);
-        when(userMapper.selectOne(any())).thenReturn(null, existing);
-
-        BusinessException error = org.assertj.core.api.Assertions.catchThrowableOfType(
-                () -> service.register(request), BusinessException.class);
-
-        assertThat(error.getCode()).isEqualTo(ResultCode.BAD_REQUEST.getCode());
-        assertThat(error).hasMessage("手机号已存在");
-        verify(userMapper, org.mockito.Mockito.never()).insert(any(User.class));
-    }
-
-    @Test
     void loginShouldReturnTokenForEnabledUser() {
         LoginRequest request = new LoginRequest();
         request.setUsername("demo");
@@ -235,48 +204,6 @@ class AuthServiceImplTest {
     }
 
     @Test
-    void loginShouldRejectWrongPassword() {
-        LoginRequest request = new LoginRequest();
-        request.setUsername("demo");
-        request.setPassword("wrong");
-        User user = new User();
-        user.setId(1L);
-        user.setUsername("demo");
-        user.setPassword("encoded");
-        user.setStatus(1);
-        when(userMapper.selectOne(any())).thenReturn(user);
-        when(roleMapper.selectRolesByUserId(1L)).thenReturn(List.of(role(2L, "ROLE_USER")));
-        when(passwordEncoder.matches("wrong", "encoded")).thenReturn(false);
-
-        BusinessException error = org.assertj.core.api.Assertions.catchThrowableOfType(
-                () -> service.login(request), BusinessException.class);
-
-        assertThat(error.getCode()).isEqualTo(ResultCode.UNAUTHORIZED.getCode());
-        verify(userMapper, org.mockito.Mockito.never()).updateById(any(User.class));
-    }
-
-    @Test
-    void loginShouldRejectDisabledUserAfterValidPassword() {
-        LoginRequest request = new LoginRequest();
-        request.setUsername("disabled");
-        request.setPassword("123456");
-        User user = new User();
-        user.setId(2L);
-        user.setUsername("disabled");
-        user.setPassword("encoded");
-        user.setStatus(0);
-        when(userMapper.selectOne(any())).thenReturn(user);
-        when(roleMapper.selectRolesByUserId(2L)).thenReturn(List.of(role(2L, "ROLE_USER")));
-        when(passwordEncoder.matches("123456", "encoded")).thenReturn(true);
-
-        BusinessException error = org.assertj.core.api.Assertions.catchThrowableOfType(
-                () -> service.login(request), BusinessException.class);
-
-        assertThat(error.getCode()).isEqualTo(ResultCode.FORBIDDEN.getCode());
-        verify(userMapper, org.mockito.Mockito.never()).updateById(any(User.class));
-    }
-
-    @Test
     void logoutShouldIgnoreBlankTokenAndBlacklistNormalToken() {
         service.logout(" ");
         verify(tokenBlacklistService, org.mockito.Mockito.never()).blacklist(any(), any());
@@ -295,16 +222,6 @@ class AuthServiceImplTest {
         role.setRoleCode(code);
         role.setStatus(1);
         return role;
-    }
-
-    private RegisterRequest validRegisterRequest() {
-        RegisterRequest request = new RegisterRequest();
-        request.setUsername("demo");
-        request.setNickname("Demo");
-        request.setPhone("13900000001");
-        request.setPassword("123456");
-        request.setConfirmPassword("123456");
-        return request;
     }
 
     private RegisterRequest validRegisterRequest() {
