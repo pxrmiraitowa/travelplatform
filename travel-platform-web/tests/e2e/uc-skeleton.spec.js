@@ -22,12 +22,32 @@ const protectedRoutes = [
   ['E2E-TC10 AI 行程入口', '/trip-plans', '行程规划']
 ]
 
-async function loginAsDemoUser(page, redirectPath) {
-  await page.goto(`/login?redirect=${encodeURIComponent(redirectPath)}`)
-  await page.getByPlaceholder('请输入用户名').fill('demo_user')
-  await page.getByPlaceholder('请输入密码').fill('123456')
-  await page.getByRole('button', { name: '登录', exact: true }).click()
-  await expect(page).toHaveURL(new RegExp(`${redirectPath.replace('/', '\\/')}$`))
+let userSequence = 0
+
+async function registerAuthenticatedUser(page) {
+  userSequence += 1
+  const suffix = String(userSequence).padStart(2, '0')
+  const timestamp = Date.now()
+  const response = await page.request.post('/api/auth/register', {
+    data: {
+      username: `e2e_${timestamp.toString(36)}_${suffix}`,
+      nickname: `端到端测试用户${suffix}`,
+      phone: `1${String(timestamp).slice(-8)}${suffix}`,
+      password: 'E2e123456',
+      confirmPassword: 'E2e123456'
+    }
+  })
+  expect(response.ok()).toBeTruthy()
+
+  const result = await response.json()
+  expect(result.code).toBe(200)
+  expect(result.data?.token).toBeTruthy()
+  expect(result.data?.userInfo).toBeTruthy()
+
+  await page.addInitScript(({ token, userInfo }) => {
+    localStorage.setItem('travel-platform-token', token)
+    localStorage.setItem('travel-platform-user', JSON.stringify(userInfo))
+  }, result.data)
 }
 
 for (const [name, route, text] of publicRoutes) {
@@ -39,7 +59,9 @@ for (const [name, route, text] of publicRoutes) {
 
 for (const [name, route, text] of protectedRoutes) {
   test(name, async ({ page }) => {
-    await loginAsDemoUser(page, route)
+    await registerAuthenticatedUser(page)
+    await page.goto(route)
+    await expect(page).toHaveURL(new RegExp(`${route.replace('/', '\\/')}$`))
     await expect(page.locator('body')).toContainText(text)
   })
 }
