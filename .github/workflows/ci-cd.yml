@@ -106,6 +106,13 @@ jobs:
         working-directory: travel-platform-server
         run: mvn -B "-Dtest=!*IntegrationTest" test | tee ../artifacts/backend-unit-tests.log
 
+      - name: Publish backend unit-test summary
+        if: always()
+        run: >-
+          python3 .github/scripts/write-test-summary.py
+          --title "Maven Unit Test Report"
+          --reports "travel-platform-server/target/surefire-reports/TEST-*.xml"
+
       - name: Retain backend unit-test evidence
         if: always()
         uses: actions/upload-artifact@v7
@@ -204,6 +211,13 @@ jobs:
           SPRING_DATASOURCE_USERNAME: root
           SPRING_DATASOURCE_PASSWORD: ${{ env.CI_DB_PASSWORD }}
         run: mvn -B "-Dtest=*IntegrationTest" test | tee ../artifacts/backend-integration-tests.log
+
+      - name: Publish integration-test summary
+        if: always()
+        run: >-
+          python3 .github/scripts/write-test-summary.py
+          --title "Maven Integration Test Report"
+          --reports "travel-platform-server/target/surefire-reports/TEST-*.xml"
 
       - name: Retain integration-test evidence
         if: always()
@@ -310,6 +324,13 @@ jobs:
         run: |
           set -o pipefail
           npm run test:e2e | tee ../artifacts/end-to-end-tests.log
+
+      - name: Publish end-to-end-test summary
+        if: always()
+        run: >-
+          python3 .github/scripts/write-test-summary.py
+          --title "Playwright End-to-End Test Report"
+          --reports "travel-platform-web/test-results/e2e-junit.xml"
 
       - name: Retain end-to-end-test evidence
         if: always()

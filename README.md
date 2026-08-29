@@ -65,7 +65,14 @@ docker compose up -d --build
 docker compose ps
 ```
 
-三个服务都应显示 `healthy`。继续验证前端和完整 API 代理链路：
+三个服务都应显示 `healthy`。
+
+验证数据库是否初始化成功：
+```powershell
+docker compose exec mysql mysql -uroot -ptravel-platform-local-db-password travel_platform -e "SELECT DATABASE(); SHOW TABLES;"
+```
+
+继续验证前端和完整 API 代理链路：
 
 ```powershell
 curl.exe --fail http://localhost:8088/healthz
@@ -180,6 +187,7 @@ git push -u github dev
 - `scripts/deploy-kind.sh`：创建 Secret、挂载数据库脚本并部署工作负载
 - `scripts/health-check.sh`：部署后健康检查
 - `scripts/collect-k8s-logs.sh`：成功或失败时收集集群诊断记录
+- `scripts/rollback-kind.sh`：将后端、前端或两者回滚到上一 Kubernetes revision，并执行健康检查
 
 Kubernetes 中的 `mysql:8.4-kind-amd64` 是流水线对官方 `mysql:8.4` amd64 精确摘要添加的 Kind 本地标签，镜像内容没有修改，也没有数据库 Dockerfile。这样可以避免多架构清单和 Kind 节点代理差异导致重复拉取。
 
@@ -203,6 +211,27 @@ $env:MYSQL_ROOT_PASSWORD = "只用于本次验证的数据库密码"
 $env:JWT_SECRET = "只用于本次验证且长度足够的JWT密钥-2026"
 bash .\scripts\deploy-kind.sh
 bash .\scripts\health-check.sh
+```
+
+如需回滚最近一次后端和前端发布，并在回滚后重新执行健康检查：
+
+```powershell
+bash .\scripts\rollback-kind.sh all
+```
+
+也可以只回滚一个组件，或为单个组件指定 Kubernetes 历史 revision：
+
+```powershell
+bash .\scripts\rollback-kind.sh backend
+bash .\scripts\rollback-kind.sh frontend
+bash .\scripts\rollback-kind.sh backend 3
+```
+
+可先使用下面的命令查看可用 revision。后端和前端的 revision 编号相互独立，指定编号时应分别回滚：
+
+```powershell
+kubectl rollout history deployment/backend -n travel-platform
+kubectl rollout history deployment/frontend -n travel-platform
 ```
 
 健康检查通过后，在浏览器访问 [http://localhost:18080](http://localhost:18080)。验证结束可删除临时集群：
