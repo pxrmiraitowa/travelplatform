@@ -5,14 +5,19 @@ import com.travelplatform.common.constant.OrderBizTypeConstant;
 import com.travelplatform.common.constant.OrderStatusConstant;
 import com.travelplatform.common.exception.BusinessException;
 import com.travelplatform.dto.order.FlightOrderCreateRequest;
+import com.travelplatform.dto.order.HotelOrderCreateRequest;
+import com.travelplatform.dto.order.TourOrderCreateRequest;
 import com.travelplatform.dto.order.TrainOrderCreateRequest;
 import com.travelplatform.entity.Coupon;
 import com.travelplatform.entity.Flight;
+import com.travelplatform.entity.Hotel;
+import com.travelplatform.entity.HotelRoom;
 import com.travelplatform.entity.OrderFlight;
 import com.travelplatform.entity.OrderTrain;
 import com.travelplatform.entity.Orders;
 import com.travelplatform.entity.Review;
 import com.travelplatform.entity.TrainTicket;
+import com.travelplatform.entity.TourPackage;
 import com.travelplatform.entity.UserContact;
 import com.travelplatform.mapper.CouponMapper;
 import com.travelplatform.mapper.FlightMapper;
@@ -49,6 +54,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -121,6 +127,87 @@ class OrderServiceImplTest {
             request.setCouponId(31L);
 
             assertThatThrownBy(() -> service.createFlightOrder(request)).isInstanceOf(BusinessException.class);
+        }
+    }
+
+    @Test
+    void createFlightOrderShouldRejectWhenStockIsEmptyAndNotWriteOrder() {
+        try (MockedStatic<SecurityUtils> mocked = mockStatic(SecurityUtils.class)) {
+            mocked.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
+            Flight flight = flight();
+            flight.setStock(0);
+            when(flightMapper.selectById(11L)).thenReturn(flight);
+            FlightOrderCreateRequest request = new FlightOrderCreateRequest();
+            request.setFlightId(11L);
+            request.setContactId(21L);
+
+            assertThatThrownBy(() -> service.createFlightOrder(request))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("code").isEqualTo(400);
+            verify(ordersMapper, never()).insert(any(Orders.class));
+            verify(userContactMapper, never()).selectById(any(Long.class));
+        }
+    }
+
+    @Test
+    void createTrainOrderShouldRejectEmptySeatStockWithBusinessCode() {
+        try (MockedStatic<SecurityUtils> mocked = mockStatic(SecurityUtils.class)) {
+            mocked.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
+            TrainTicket ticket = trainTicket();
+            ticket.setFirstClassStock(0);
+            when(trainTicketMapper.selectById(12L)).thenReturn(ticket);
+            when(userContactMapper.selectById(21L)).thenReturn(contact());
+            TrainOrderCreateRequest request = new TrainOrderCreateRequest();
+            request.setTrainTicketId(12L);
+            request.setContactId(21L);
+            request.setSeatType("一等座");
+
+            assertThatThrownBy(() -> service.createTrainOrder(request))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("code").isEqualTo(400);
+            verify(ordersMapper, never()).insert(any(Orders.class));
+            verify(trainTicketMapper, never()).updateById(any(TrainTicket.class));
+        }
+    }
+
+    @Test
+    void createHotelOrderShouldRejectEmptyRoomStockWithoutMapperWrites() {
+        try (MockedStatic<SecurityUtils> mocked = mockStatic(SecurityUtils.class)) {
+            mocked.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
+            when(hotelMapper.selectById(51L)).thenReturn(hotel());
+            HotelRoom room = hotelRoom();
+            room.setStock(0);
+            when(hotelRoomMapper.selectById(52L)).thenReturn(room);
+            HotelOrderCreateRequest request = new HotelOrderCreateRequest();
+            request.setHotelId(51L);
+            request.setHotelRoomId(52L);
+            request.setContactId(21L);
+            request.setCheckInDate(LocalDate.now().plusDays(1));
+            request.setCheckOutDate(LocalDate.now().plusDays(2));
+
+            assertThatThrownBy(() -> service.createHotelOrder(request))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("code").isEqualTo(400);
+            verify(ordersMapper, never()).insert(any(Orders.class));
+            verify(hotelRoomMapper, never()).updateById(any(HotelRoom.class));
+        }
+    }
+
+    @Test
+    void createTourOrderShouldRejectUnsupportedTravelDateBeforeCheckingStock() {
+        try (MockedStatic<SecurityUtils> mocked = mockStatic(SecurityUtils.class)) {
+            mocked.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
+            when(tourPackageMapper.selectById(61L)).thenReturn(tourPackage());
+            TourOrderCreateRequest request = new TourOrderCreateRequest();
+            request.setTourPackageId(61L);
+            request.setContactId(21L);
+            request.setTravelDate(LocalDate.now().plusDays(3));
+
+            assertThatThrownBy(() -> service.createTourOrder(request))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("code").isEqualTo(400);
+            verify(ordersMapper, never()).insert(any(Orders.class));
+            verify(userContactMapper, never()).selectById(any(Long.class));
         }
     }
 
@@ -203,6 +290,21 @@ class OrderServiceImplTest {
             when(trainTicketMapper.selectById(12L)).thenReturn(ticket);
 
             assertThatThrownBy(() -> service.cancelCurrentUserOrder(102L)).isInstanceOf(BusinessException.class);
+        }
+    }
+
+    @Test
+    void getCurrentUserOrderDetailShouldRejectAnotherUsersOrder() {
+        try (MockedStatic<SecurityUtils> mocked = mockStatic(SecurityUtils.class)) {
+            mocked.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
+            Orders otherUsersOrder = order(101L, OrderBizTypeConstant.FLIGHT);
+            otherUsersOrder.setUserId(2L);
+            when(ordersMapper.selectById(101L)).thenReturn(otherUsersOrder);
+
+            assertThatThrownBy(() -> service.getCurrentUserOrderDetail(101L))
+                    .isInstanceOf(BusinessException.class)
+                    .extracting("code").isEqualTo(404);
+            verify(orderFlightMapper, never()).selectOne(any());
         }
     }
 
@@ -320,6 +422,37 @@ class OrderServiceImplTest {
         ticket.setFirstClassStock(2);
         ticket.setStatus(1);
         return ticket;
+    }
+
+    private Hotel hotel() {
+        Hotel hotel = new Hotel();
+        hotel.setId(51L);
+        hotel.setHotelName("Test Hotel");
+        hotel.setCity("Shanghai");
+        hotel.setStatus(1);
+        return hotel;
+    }
+
+    private HotelRoom hotelRoom() {
+        HotelRoom room = new HotelRoom();
+        room.setId(52L);
+        room.setHotelId(51L);
+        room.setRoomName("Standard");
+        room.setPrice(new BigDecimal("300"));
+        room.setStock(2);
+        room.setStatus(1);
+        return room;
+    }
+
+    private TourPackage tourPackage() {
+        TourPackage item = new TourPackage();
+        item.setId(61L);
+        item.setPackageName("Test Tour");
+        item.setTravelDates("2026-09-01,2026-09-02");
+        item.setPrice(new BigDecimal("800"));
+        item.setStock(2);
+        item.setStatus(1);
+        return item;
     }
 
     private Review review(Long orderId) {
