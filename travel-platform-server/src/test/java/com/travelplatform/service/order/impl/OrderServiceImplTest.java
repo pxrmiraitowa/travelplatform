@@ -197,7 +197,10 @@ class OrderServiceImplTest {
     void createTourOrderShouldRejectUnsupportedTravelDateBeforeCheckingStock() {
         try (MockedStatic<SecurityUtils> mocked = mockStatic(SecurityUtils.class)) {
             mocked.when(SecurityUtils::getCurrentUserId).thenReturn(1L);
-            when(tourPackageMapper.selectById(61L)).thenReturn(tourPackage());
+            TourPackage tourPackage = tourPackage();
+            tourPackage.setTravelDates(
+                    LocalDate.now().plusDays(1) + "," + LocalDate.now().plusDays(2));
+            when(tourPackageMapper.selectById(61L)).thenReturn(tourPackage);
             TourOrderCreateRequest request = new TourOrderCreateRequest();
             request.setTourPackageId(61L);
             request.setContactId(21L);
