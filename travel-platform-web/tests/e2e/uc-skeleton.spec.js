@@ -16,8 +16,8 @@ const publicRoutes = [
 
 const protectedRoutes = [
   ['E2E-TC02 个人资料入口', '/profile', '个人中心'],
-  ['E2E-TC07 订单入口', '/orders', '我的订单'],
-  ['E2E-TC08 评价入口', '/orders', '我的订单'],
+  ['E2E-TC07 订单入口', '/orders', '统一订单中心'],
+  ['E2E-TC08 评价入口', '/orders', '统一订单中心'],
   ['E2E-TC09 行程规划入口', '/trip-plans', '行程规划'],
   ['E2E-TC10 AI 行程入口', '/trip-plans', '行程规划']
 ]
