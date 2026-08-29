@@ -433,3 +433,104 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
           path: artifacts/**
+
+  end_to_end_test:
+    name: 7. End-to-end tests
+    needs:
+      - build_images
+      - deploy_and_health_check
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    permissions:
+      contents: read
+      packages: read
+    env:
+      BACKEND_IMAGE: ${{ needs.build_images.outputs.backend_image }}
+      FRONTEND_IMAGE: ${{ needs.build_images.outputs.frontend_image }}
+      IMAGE_TAG: ${{ needs.build_images.outputs.image_tag }}
+      E2E_BASE_URL: http://127.0.0.1:18080
+
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v7
+
+      - name: Prepare evidence directory
+        run: mkdir -p artifacts
+
+      - name: Set up Node.js 22 and npm cache
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: travel-platform-web/package-lock.json
+
+      - name: Install frontend and Playwright dependencies
+        working-directory: travel-platform-web
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Log in to GHCR for E2E deployment
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Kind v0.32.0
+        shell: bash
+        run: |
+          curl --fail --location --retry 3 \
+            --output kind https://kind.sigs.k8s.io/dl/v0.32.0/kind-linux-amd64
+          chmod +x kind
+          sudo install kind /usr/local/bin/kind
+
+      - name: Create isolated E2E Kind cluster
+        run: >-
+          kind create cluster
+          --name "${KIND_CLUSTER_NAME}"
+          --config deploy/kind/cluster.yaml
+          --wait 180s
+
+      - name: Load release images into E2E cluster
+        shell: bash
+        run: |
+          docker pull "${MYSQL_SOURCE_IMAGE}"
+          docker tag "${MYSQL_SOURCE_IMAGE}" "${MYSQL_KIND_IMAGE}"
+          docker pull "${BACKEND_IMAGE}:${IMAGE_TAG}"
+          docker pull "${FRONTEND_IMAGE}:${IMAGE_TAG}"
+          kind load docker-image "${MYSQL_KIND_IMAGE}" --name "${KIND_CLUSTER_NAME}"
+          kind load docker-image "${BACKEND_IMAGE}:${IMAGE_TAG}" --name "${KIND_CLUSTER_NAME}"
+          kind load docker-image "${FRONTEND_IMAGE}:${IMAGE_TAG}" --name "${KIND_CLUSTER_NAME}"
+
+      - name: Deploy application for E2E tests
+        env:
+          MYSQL_ROOT_PASSWORD: ${{ env.CI_DB_PASSWORD }}
+          JWT_SECRET: ${{ env.CI_JWT_SECRET }}
+        run: bash scripts/deploy-kind.sh | tee artifacts/e2e-deployment.log
+
+      - name: Wait for application readiness
+        run: bash scripts/health-check.sh | tee artifacts/e2e-health-check.log
+
+      - name: Run Playwright end-to-end tests
+        working-directory: travel-platform-web
+        run: npm run test:e2e | tee ../artifacts/end-to-end-tests.log
+
+      - name: Collect E2E and Kubernetes diagnostics
+        if: always()
+        shell: bash
+        run: |
+          docker ps -a > artifacts/e2e-docker-containers.txt 2>&1 || true
+          bash scripts/collect-k8s-logs.sh artifacts/e2e-k8s || true
+
+      - name: Retain end-to-end-test evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: end-to-end-test-evidence-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            artifacts/**
+            travel-platform-web/playwright-report/**
+            travel-platform-web/test-results/**
