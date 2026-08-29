@@ -1,4 +1,4 @@
-name: CI/CD - GitHub Actions, GHCR and Kind
+name: Travel Platform - CI then CD
 
 on:
   push:
@@ -21,8 +21,9 @@ env:
   MYSQL_KIND_IMAGE: mysql:8.4-kind-amd64
 
 jobs:
-  build:
-    name: 1. Compile
+  # CI stage: checkout, dependency installation, compilation and automated tests.
+  ci_build:
+    name: CI 1/5 - Checkout, dependencies and compile
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -76,9 +77,9 @@ jobs:
             travel-platform-server/target/*.jar
             travel-platform-web/dist/**
 
-  backend_unit_test:
-    name: 2. Backend unit tests
-    needs: build
+  ci_backend_unit_test:
+    name: CI 2/5 - Backend unit tests
+    needs: ci_build
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -117,9 +118,9 @@ jobs:
             travel-platform-server/target/surefire-reports/**
             travel-platform-server/target/site/jacoco/**
 
-  frontend_unit_test:
-    name: 3. Frontend unit tests
-    needs: build
+  ci_frontend_unit_test:
+    name: CI 3/5 - Frontend unit tests
+    needs: ci_build
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -153,12 +154,11 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
           path: artifacts/**
-
-  integration_test:
-    name: 4. Integration tests
+  ci_integration_test:
+    name: CI 4/5 - Integration tests
     needs:
-      - backend_unit_test
-      - frontend_unit_test
+      - ci_backend_unit_test
+      - ci_frontend_unit_test
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -217,9 +217,116 @@ jobs:
             travel-platform-server/target/surefire-reports/**
             travel-platform-server/target/site/jacoco/**
 
-  build_images:
-    name: 5. Build and push images
-    needs: integration_test
+  ci_end_to_end_test:
+    name: CI 5/5 - End-to-end tests
+    needs: ci_integration_test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: travel_platform_e2e
+          MYSQL_ROOT_PASSWORD: travel-platform-ci-db-password
+          TZ: Asia/Shanghai
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -ptravel-platform-ci-db-password --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+          --health-start-period=20s
+
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v7
+
+      - name: Prepare evidence directory
+        run: mkdir -p artifacts
+
+      - name: Set up JDK 17 and Maven cache
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+          cache-dependency-path: travel-platform-server/pom.xml
+
+      - name: Set up Node.js 22 and npm cache
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: travel-platform-web/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: travel-platform-server
+        run: mvn -B dependency:go-offline | tee ../artifacts/e2e-backend-dependencies.log
+
+      - name: Install frontend and Playwright dependencies
+        working-directory: travel-platform-web
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Start backend for E2E tests
+        working-directory: travel-platform-server
+        env:
+          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/travel_platform_e2e?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: ${{ env.CI_DB_PASSWORD }}
+          JWT_SECRET: ${{ env.CI_JWT_SECRET }}
+        shell: bash
+        run: |
+          nohup mvn -B spring-boot:run > ../artifacts/e2e-backend.log 2>&1 &
+          echo $! > ../artifacts/e2e-backend.pid
+
+      - name: Wait for backend readiness
+        run: >-
+          curl --fail --silent --show-error
+          --retry 40 --retry-delay 3 --retry-all-errors
+          http://127.0.0.1:8080/api/public/health
+
+      - name: Start frontend for E2E tests
+        working-directory: travel-platform-web
+        shell: bash
+        run: |
+          nohup npm run dev -- --host 127.0.0.1 > ../artifacts/e2e-frontend.log 2>&1 &
+          echo $! > ../artifacts/e2e-frontend.pid
+
+      - name: Wait for frontend readiness
+        run: >-
+          curl --fail --silent --show-error
+          --retry 30 --retry-delay 2 --retry-all-errors
+          http://127.0.0.1:5173/
+
+      - name: Run Playwright end-to-end tests
+        working-directory: travel-platform-web
+        env:
+          E2E_BASE_URL: http://127.0.0.1:5173
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:e2e | tee ../artifacts/end-to-end-tests.log
+
+      - name: Retain end-to-end-test evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: end-to-end-test-evidence-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            artifacts/**
+            travel-platform-web/playwright-report/**
+            travel-platform-web/test-results/**
+
+  # CD stage starts only after every CI test job has succeeded.
+  cd_build_images:
+    name: CD 1/2 - Build and publish images
+    needs: ci_end_to_end_test
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -335,18 +442,18 @@ jobs:
           retention-days: 30
           path: artifacts/**
 
-  deploy_and_health_check:
-    name: 6. Deploy and health check
-    needs: build_images
+  cd_deploy_and_health_check:
+    name: CD 2/2 - Deploy to Kubernetes and health check
+    needs: cd_build_images
     runs-on: ubuntu-latest
     timeout-minutes: 35
     permissions:
       contents: read
       packages: read
     env:
-      BACKEND_IMAGE: ${{ needs.build_images.outputs.backend_image }}
-      FRONTEND_IMAGE: ${{ needs.build_images.outputs.frontend_image }}
-      IMAGE_TAG: ${{ needs.build_images.outputs.image_tag }}
+      BACKEND_IMAGE: ${{ needs.cd_build_images.outputs.backend_image }}
+      FRONTEND_IMAGE: ${{ needs.cd_build_images.outputs.frontend_image }}
+      IMAGE_TAG: ${{ needs.cd_build_images.outputs.image_tag }}
 
     steps:
       - name: Check out source code
@@ -421,8 +528,8 @@ jobs:
             echo "result=${{ job.status }}"
             echo "backend_image=${BACKEND_IMAGE}:${IMAGE_TAG}"
             echo "frontend_image=${FRONTEND_IMAGE}:${IMAGE_TAG}"
-            echo "backend_digest=${{ needs.build_images.outputs.backend_digest }}"
-            echo "frontend_digest=${{ needs.build_images.outputs.frontend_digest }}"
+            echo "backend_digest=${{ needs.cd_build_images.outputs.backend_digest }}"
+            echo "frontend_digest=${{ needs.cd_build_images.outputs.frontend_digest }}"
           } > artifacts/run-summary.txt
 
       - name: Retain deployment and health-check evidence
@@ -433,107 +540,3 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
           path: artifacts/**
-
-  end_to_end_test:
-    name: 7. End-to-end tests
-    needs:
-      - build_images
-      - deploy_and_health_check
-    runs-on: ubuntu-latest
-    timeout-minutes: 35
-    permissions:
-      contents: read
-      packages: read
-    env:
-      BACKEND_IMAGE: ${{ needs.build_images.outputs.backend_image }}
-      FRONTEND_IMAGE: ${{ needs.build_images.outputs.frontend_image }}
-      IMAGE_TAG: ${{ needs.build_images.outputs.image_tag }}
-      E2E_BASE_URL: http://127.0.0.1:18080
-
-    steps:
-      - name: Check out source code
-        uses: actions/checkout@v7
-
-      - name: Prepare evidence directory
-        run: mkdir -p artifacts
-
-      - name: Set up Node.js 22 and npm cache
-        uses: actions/setup-node@v7
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: travel-platform-web/package-lock.json
-
-      - name: Install frontend and Playwright dependencies
-        working-directory: travel-platform-web
-        run: |
-          npm ci
-          npx playwright install --with-deps chromium
-
-      - name: Log in to GHCR for E2E deployment
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install Kind v0.32.0
-        shell: bash
-        run: |
-          curl --fail --location --retry 3 \
-            --output kind https://kind.sigs.k8s.io/dl/v0.32.0/kind-linux-amd64
-          chmod +x kind
-          sudo install kind /usr/local/bin/kind
-
-      - name: Create isolated E2E Kind cluster
-        run: >-
-          kind create cluster
-          --name "${KIND_CLUSTER_NAME}"
-          --config deploy/kind/cluster.yaml
-          --wait 180s
-
-      - name: Load release images into E2E cluster
-        shell: bash
-        run: |
-          docker pull "${MYSQL_SOURCE_IMAGE}"
-          docker tag "${MYSQL_SOURCE_IMAGE}" "${MYSQL_KIND_IMAGE}"
-          docker pull "${BACKEND_IMAGE}:${IMAGE_TAG}"
-          docker pull "${FRONTEND_IMAGE}:${IMAGE_TAG}"
-          kind load docker-image "${MYSQL_KIND_IMAGE}" --name "${KIND_CLUSTER_NAME}"
-          kind load docker-image "${BACKEND_IMAGE}:${IMAGE_TAG}" --name "${KIND_CLUSTER_NAME}"
-          kind load docker-image "${FRONTEND_IMAGE}:${IMAGE_TAG}" --name "${KIND_CLUSTER_NAME}"
-
-      - name: Deploy application for E2E tests
-        env:
-          MYSQL_ROOT_PASSWORD: ${{ env.CI_DB_PASSWORD }}
-          JWT_SECRET: ${{ env.CI_JWT_SECRET }}
-        run: bash scripts/deploy-kind.sh | tee artifacts/e2e-deployment.log
-
-      - name: Wait for application readiness
-        run: bash scripts/health-check.sh | tee artifacts/e2e-health-check.log
-
-      - name: Run Playwright end-to-end tests
-        working-directory: travel-platform-web
-        shell: bash
-        run: |
-          set -o pipefail
-          npm run test:e2e | tee ../artifacts/end-to-end-tests.log
-
-      - name: Collect E2E and Kubernetes diagnostics
-        if: always()
-        shell: bash
-        run: |
-          docker ps -a > artifacts/e2e-docker-containers.txt 2>&1 || true
-          bash scripts/collect-k8s-logs.sh artifacts/e2e-k8s || true
-
-      - name: Retain end-to-end-test evidence
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: end-to-end-test-evidence-${{ github.run_id }}
-          if-no-files-found: warn
-          retention-days: 30
-          path: |
-            artifacts/**
-            travel-platform-web/playwright-report/**
-            travel-platform-web/test-results/**
