@@ -514,7 +514,10 @@ jobs:
 
       - name: Run Playwright end-to-end tests
         working-directory: travel-platform-web
-        run: npm run test:e2e | tee ../artifacts/end-to-end-tests.log
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:e2e | tee ../artifacts/end-to-end-tests.log
 
       - name: Collect E2E and Kubernetes diagnostics
         if: always()
