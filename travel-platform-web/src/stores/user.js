@@ -8,7 +8,9 @@ const USER_KEY = 'travel-platform-user'
 export const useUserStore = defineStore('user', {
   state: () => ({
     token: localStorage.getItem(TOKEN_KEY) || '',
-    userInfo: JSON.parse(localStorage.getItem(USER_KEY) || 'null')
+    userInfo: JSON.parse(localStorage.getItem(USER_KEY) || 'null'),
+    // Persisted user data is only a startup snapshot. Refresh it once after each page load.
+    profileSynced: false
   }),
   getters: {
     isLoggedIn: (state) => Boolean(state.token),
@@ -18,11 +20,13 @@ export const useUserStore = defineStore('user', {
     setLogin(token, userInfo) {
       this.token = token
       this.userInfo = userInfo
+      this.profileSynced = true
       localStorage.setItem(TOKEN_KEY, token)
       localStorage.setItem(USER_KEY, JSON.stringify(userInfo))
     },
     setUserInfo(userInfo) {
       this.userInfo = userInfo
+      this.profileSynced = true
       localStorage.setItem(USER_KEY, JSON.stringify(userInfo))
     },
     async fetchCurrentUser() {
@@ -41,6 +45,7 @@ export const useUserStore = defineStore('user', {
     clearLogin() {
       this.token = ''
       this.userInfo = null
+      this.profileSynced = false
       localStorage.removeItem(TOKEN_KEY)
       localStorage.removeItem(USER_KEY)
     },

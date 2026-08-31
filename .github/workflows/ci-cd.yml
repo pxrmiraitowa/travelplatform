@@ -1,4 +1,4 @@
-name: Microservices CI/CD - GitHub Actions, GHCR and Kind
+name: Travel Platform Microservices - CI then CD
 
 on:
   push:
@@ -30,9 +30,13 @@ env:
   MYSQL_SOURCE_IMAGE: mysql:8.4@sha256:1d6b6a8fcee8ff758ff151d017f5203cd06792a0e698f0a593c9dfcb14609cf0
   MYSQL_KIND_IMAGE: mysql:8.4-kind-amd64
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
-  build:
-    name: 1. Compile
+  ci_build:
+    name: CI 1/6 - Checkout, dependencies and compile
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -49,7 +53,9 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: maven
-          cache-dependency-path: travel-platform-microservices/pom.xml
+          cache-dependency-path: |
+            travel-platform-server/pom.xml
+            travel-platform-microservices/pom.xml
 
       - name: Set up Node.js 22 and npm cache
         uses: actions/setup-node@v7
@@ -62,6 +68,10 @@ jobs:
         working-directory: travel-platform-microservices
         run: mvn -B dependency:go-offline | tee ../artifacts/microservices-dependencies.log
 
+      - name: Install monolith compatibility dependencies
+        working-directory: travel-platform-server
+        run: mvn -B dependency:go-offline | tee ../artifacts/monolith-dependencies.log
+
       - name: Install frontend dependencies
         working-directory: travel-platform-web
         run: npm ci | tee ../artifacts/frontend-dependencies.log
@@ -69,6 +79,10 @@ jobs:
       - name: Compile and package microservices
         working-directory: travel-platform-microservices
         run: mvn -B -DskipTests clean package | tee ../artifacts/microservices-build.log
+
+      - name: Compile monolith compatibility application
+        working-directory: travel-platform-server
+        run: mvn -B -DskipTests clean package | tee ../artifacts/monolith-build.log
 
       - name: Compile frontend
         working-directory: travel-platform-web
@@ -84,11 +98,59 @@ jobs:
           path: |
             artifacts/**
             travel-platform-microservices/*-service/target/*.jar
+            travel-platform-server/target/*.jar
             travel-platform-web/dist/**
 
-  microservice_unit_test:
-    name: 2. Microservice unit tests
-    needs: build
+  ci_monolith_unit_test:
+    name: CI 2/6 - Monolith compatibility unit tests
+    needs: ci_build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v7
+
+      - name: Prepare evidence directory
+        run: mkdir -p artifacts
+
+      - name: Set up JDK 17 and Maven cache
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+          cache-dependency-path: travel-platform-server/pom.xml
+
+      - name: Run monolith compatibility unit tests
+        working-directory: travel-platform-server
+        shell: bash
+        run: |
+          set -o pipefail
+          mvn -B "-Dtest=!*IntegrationTest" test | tee ../artifacts/monolith-unit-tests.log
+
+      - name: Publish monolith unit-test summary
+        if: always()
+        run: >-
+          python3 .github/scripts/write-test-summary.py
+          --title "Monolith Compatibility Unit Test Report"
+          --reports "travel-platform-server/target/surefire-reports/TEST-*.xml"
+
+      - name: Retain monolith unit-test evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: monolith-unit-test-evidence-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            artifacts/**
+            travel-platform-server/target/surefire-reports/**
+            travel-platform-server/target/site/jacoco/**
+
+  ci_microservice_unit_test:
+    name: CI 3/6 - Microservice unit tests
+    needs: ci_build
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -109,7 +171,17 @@ jobs:
 
       - name: Run microservice unit tests
         working-directory: travel-platform-microservices
-        run: mvn -B -pl user-service,product-service,order-service,content-trip-service,gateway-service -am test | tee ../artifacts/microservices-unit-tests.log
+        shell: bash
+        run: |
+          set -o pipefail
+          mvn -B -pl user-service,product-service,order-service,content-trip-service,gateway-service -am test | tee ../artifacts/microservices-unit-tests.log
+
+      - name: Publish microservice unit-test summary
+        if: always()
+        run: >-
+          python3 .github/scripts/write-test-summary.py
+          --title "Microservice Unit Test Report"
+          --reports "travel-platform-microservices/*-service/target/surefire-reports/TEST-*.xml"
 
       - name: Retain microservice unit-test evidence
         if: always()
@@ -122,9 +194,9 @@ jobs:
             artifacts/**
             travel-platform-microservices/*-service/target/surefire-reports/**
 
-  frontend_unit_test:
-    name: 3. Frontend unit tests
-    needs: build
+  ci_frontend_unit_test:
+    name: CI 4/6 - Frontend unit tests
+    needs: ci_build
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -148,7 +220,10 @@ jobs:
 
       - name: Run frontend unit tests
         working-directory: travel-platform-web
-        run: npm run test:unit | tee ../artifacts/frontend-unit-tests.log
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:unit | tee ../artifacts/frontend-unit-tests.log
 
       - name: Retain frontend unit-test evidence
         if: always()
@@ -159,12 +234,194 @@ jobs:
           retention-days: 30
           path: artifacts/**
 
-  build_images:
-    name: 4. Build and push images
+  ci_integration_test:
+    name: CI 5/6 - Monolith integration and API tests
+    needs:
+      - ci_monolith_unit_test
+      - ci_frontend_unit_test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: travel_platform_it
+          MYSQL_ROOT_PASSWORD: travel-platform-ci-db-password
+          TZ: Asia/Shanghai
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -ptravel-platform-ci-db-password --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+          --health-start-period=20s
+
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v7
+
+      - name: Prepare evidence directory
+        run: mkdir -p artifacts
+
+      - name: Set up JDK 17 and Maven cache
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+          cache-dependency-path: travel-platform-server/pom.xml
+
+      - name: Run monolith integration and API tests
+        working-directory: travel-platform-server
+        env:
+          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/travel_platform_it?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: ${{ env.CI_DB_PASSWORD }}
+        shell: bash
+        run: |
+          set -o pipefail
+          mvn -B "-Dtest=*IntegrationTest" test | tee ../artifacts/monolith-integration-tests.log
+
+      - name: Publish integration-test summary
+        if: always()
+        run: >-
+          python3 .github/scripts/write-test-summary.py
+          --title "Monolith Integration and API Test Report"
+          --reports "travel-platform-server/target/surefire-reports/TEST-*.xml"
+
+      - name: Retain integration-test evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: monolith-integration-test-evidence-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            artifacts/**
+            travel-platform-server/target/surefire-reports/**
+            travel-platform-server/target/site/jacoco/**
+
+  ci_browser_e2e_test:
+    name: CI 6/6 - Playwright browser E2E tests
+    needs:
+      - ci_integration_test
+      - ci_frontend_unit_test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: travel_platform_e2e
+          MYSQL_ROOT_PASSWORD: travel-platform-ci-db-password
+          TZ: Asia/Shanghai
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -ptravel-platform-ci-db-password --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+          --health-start-period=20s
+
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v7
+
+      - name: Prepare evidence directory
+        run: mkdir -p artifacts
+
+      - name: Set up JDK 17 and Maven cache
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+          cache-dependency-path: travel-platform-server/pom.xml
+
+      - name: Set up Node.js 22 and npm cache
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: travel-platform-web/package-lock.json
+
+      - name: Install frontend and Playwright dependencies
+        working-directory: travel-platform-web
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Start monolith compatibility backend
+        working-directory: travel-platform-server
+        env:
+          SPRING_DATASOURCE_URL: jdbc:mysql://127.0.0.1:3306/travel_platform_e2e?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: ${{ env.CI_DB_PASSWORD }}
+          JWT_SECRET: ${{ env.CI_JWT_SECRET }}
+        shell: bash
+        run: |
+          nohup mvn -B spring-boot:run > ../artifacts/browser-e2e-backend.log 2>&1 &
+          echo $! > ../artifacts/browser-e2e-backend.pid
+
+      - name: Wait for backend readiness
+        run: >-
+          curl --fail --silent --show-error
+          --retry 40 --retry-delay 3 --retry-all-errors
+          http://127.0.0.1:8080/api/public/health
+
+      - name: Start frontend for browser E2E tests
+        working-directory: travel-platform-web
+        shell: bash
+        run: |
+          nohup npm run dev -- --host 127.0.0.1 > ../artifacts/browser-e2e-frontend.log 2>&1 &
+          echo $! > ../artifacts/browser-e2e-frontend.pid
+
+      - name: Wait for frontend readiness
+        run: >-
+          curl --fail --silent --show-error
+          --retry 30 --retry-delay 2 --retry-all-errors
+          http://127.0.0.1:5173/
+
+      - name: Run Playwright browser E2E tests
+        working-directory: travel-platform-web
+        env:
+          E2E_BASE_URL: http://127.0.0.1:5173
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:e2e:browser | tee ../artifacts/browser-end-to-end-tests.log
+
+      - name: Publish browser E2E summary
+        if: always()
+        run: >-
+          python3 .github/scripts/write-test-summary.py
+          --title "Playwright Browser End-to-End Test Report"
+          --reports "travel-platform-web/test-results/e2e-junit.xml"
+
+      - name: Retain browser E2E evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-end-to-end-test-evidence-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            artifacts/**
+            travel-platform-web/playwright-report/**
+            travel-platform-web/test-results/**
+
+  cd_build_images:
+    name: CD 1/2 - Build and publish microservice images
     if: github.event_name != 'pull_request'
     needs:
-      - microservice_unit_test
-      - frontend_unit_test
+      - ci_microservice_unit_test
+      - ci_frontend_unit_test
+      - ci_integration_test
+      - ci_browser_e2e_test
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -347,17 +604,17 @@ jobs:
           retention-days: 30
           path: artifacts/**
 
-  deploy_and_health_check:
-    name: 5. Deploy and health check
-    needs: build_images
+  cd_deploy_and_health_check:
+    name: CD 2/2 - Deploy microservices and run deployed regression
+    needs: cd_build_images
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
       contents: read
       packages: read
     env:
-      IMAGE_PREFIX: ${{ needs.build_images.outputs.image_prefix }}
-      IMAGE_TAG: ${{ needs.build_images.outputs.image_tag }}
+      IMAGE_PREFIX: ${{ needs.cd_build_images.outputs.image_prefix }}
+      IMAGE_TAG: ${{ needs.cd_build_images.outputs.image_tag }}
 
     steps:
       - name: Check out source code
@@ -431,6 +688,7 @@ jobs:
           API_BASE_URL: http://127.0.0.1:8000/api
         shell: bash
         run: |
+          set -o pipefail
           pids=()
           cleanup() {
             for pid in "${pids[@]}"; do
@@ -468,6 +726,22 @@ jobs:
 
           npm run test:regression | tee ../artifacts/deployed-regression.log
 
+      - name: Run Playwright against deployed microservices
+        working-directory: travel-platform-web
+        env:
+          E2E_BASE_URL: http://127.0.0.1:18080
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:e2e:browser | tee ../artifacts/deployed-browser-e2e.log
+
+      - name: Publish deployed browser E2E summary
+        if: always()
+        run: >-
+          python3 .github/scripts/write-test-summary.py
+          --title "Deployed Microservices Browser E2E Report"
+          --reports "travel-platform-web/test-results/e2e-junit.xml"
+
       - name: Run optional deployment failure drill
         if: github.event_name == 'workflow_dispatch' && inputs.run_failure_drill
         run: bash scripts/failure-drill.sh | tee artifacts/deployment-failure-drill.log
@@ -498,12 +772,12 @@ jobs:
             echo "content_trip_service=${IMAGE_PREFIX}-content-trip-service:${IMAGE_TAG}"
             echo "gateway_service=${IMAGE_PREFIX}-gateway-service:${IMAGE_TAG}"
             echo "frontend=${IMAGE_PREFIX}-web:${IMAGE_TAG}"
-            echo "user_digest=${{ needs.build_images.outputs.user_digest }}"
-            echo "product_digest=${{ needs.build_images.outputs.product_digest }}"
-            echo "order_digest=${{ needs.build_images.outputs.order_digest }}"
-            echo "content_trip_digest=${{ needs.build_images.outputs.content_trip_digest }}"
-            echo "gateway_digest=${{ needs.build_images.outputs.gateway_digest }}"
-            echo "frontend_digest=${{ needs.build_images.outputs.frontend_digest }}"
+            echo "user_digest=${{ needs.cd_build_images.outputs.user_digest }}"
+            echo "product_digest=${{ needs.cd_build_images.outputs.product_digest }}"
+            echo "order_digest=${{ needs.cd_build_images.outputs.order_digest }}"
+            echo "content_trip_digest=${{ needs.cd_build_images.outputs.content_trip_digest }}"
+            echo "gateway_digest=${{ needs.cd_build_images.outputs.gateway_digest }}"
+            echo "frontend_digest=${{ needs.cd_build_images.outputs.frontend_digest }}"
           } > artifacts/run-summary.txt
 
       - name: Retain deployment and health-check evidence
@@ -513,4 +787,7 @@ jobs:
           name: microservices-deployment-evidence-${{ github.run_id }}
           if-no-files-found: warn
           retention-days: 30
-          path: artifacts/**
+          path: |
+            artifacts/**
+            travel-platform-web/playwright-report/**
+            travel-platform-web/test-results/**

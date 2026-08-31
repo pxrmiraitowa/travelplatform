@@ -46,8 +46,8 @@ describe('认证 API', () => {
     await logout()
 
     expect(request.mock.calls).toEqual([
-      [{ url: '/admin/auth/login', method: 'post', data: { username: 'admin', password: 'secret' } }],
-      [{ url: '/admin/auth/me', method: 'get' }],
+      [{ url: '/auth/login', method: 'post', data: { username: 'admin', password: 'secret' } }],
+      [{ url: '/users/me', method: 'get' }],
       [{ url: '/auth/logout', method: 'post' }]
     ])
   })

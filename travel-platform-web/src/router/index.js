@@ -77,7 +77,8 @@ router.beforeEach(async (to) => {
     document.title = `${to.meta.title} - 出行旅游平台`
   }
 
-  if (userStore.isLoggedIn && !userStore.userInfo) {
+  // Refresh a restored login once per page load instead of trusting stale localStorage data.
+  if (userStore.isLoggedIn && !userStore.profileSynced) {
     try {
       await userStore.fetchCurrentUser()
     } catch (error) {

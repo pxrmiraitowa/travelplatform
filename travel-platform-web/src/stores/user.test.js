@@ -35,7 +35,23 @@ describe('user store', () => {
     expect(store.token).toBe('token-123')
     expect(store.isLoggedIn).toBe(true)
     expect(store.isAdmin).toBe(true)
+    expect(store.profileSynced).toBe(true)
     expect(localStorage.getItem('travel-platform-token')).toBe('token-123')
+  })
+
+  it('refreshes and replaces stale persisted user information', async () => {
+    const store = useUserStore()
+    store.token = 'token-123'
+    store.userInfo = { username: 'admin', nickname: 'garbled', roleCodes: ['ROLE_ADMIN'] }
+    mocks.getCurrentUser.mockResolvedValueOnce({
+      data: { username: 'admin', nickname: '系统管理员', roleCodes: ['ROLE_ADMIN'] }
+    })
+
+    await store.fetchCurrentUser()
+
+    expect(store.profileSynced).toBe(true)
+    expect(store.userInfo.nickname).toBe('系统管理员')
+    expect(JSON.parse(localStorage.getItem('travel-platform-user')).nickname).toBe('系统管理员')
   })
 
   it('clears login state from memory and localStorage', () => {
@@ -47,6 +63,7 @@ describe('user store', () => {
     expect(store.token).toBe('')
     expect(store.userInfo).toBeNull()
     expect(store.isLoggedIn).toBe(false)
+    expect(store.profileSynced).toBe(false)
     expect(localStorage.getItem('travel-platform-token')).toBeNull()
     expect(localStorage.getItem('travel-platform-user')).toBeNull()
   })
