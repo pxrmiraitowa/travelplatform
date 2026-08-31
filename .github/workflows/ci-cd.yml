@@ -74,7 +74,11 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: travel-platform-web
-        run: npm ci | tee ../artifacts/frontend-dependencies.log
+        run: |
+          npm config set fetch-retries 5
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retry-maxtimeout 120000
+          npm ci | tee ../artifacts/frontend-dependencies.log
 
       - name: Compile and package microservices
         working-directory: travel-platform-microservices
