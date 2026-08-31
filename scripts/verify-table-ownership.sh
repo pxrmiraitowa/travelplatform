@@ -17,7 +17,7 @@ declare -A expected_tables=(
 
 for database in travel_user travel_product travel_order travel_content_trip; do
   actual="$(kubectl --namespace "${NAMESPACE}" exec statefulset/mysql -- sh -c \
-    "mysql -N -B -uroot -p\"\$MYSQL_ROOT_PASSWORD\" -e \"SELECT COALESCE(GROUP_CONCAT(table_name ORDER BY table_name SEPARATOR ','), '') FROM information_schema.tables WHERE table_schema='${database}'\"")"
+    "mysql -h127.0.0.1 -P3306 -N -B -uroot -p\"\$MYSQL_ROOT_PASSWORD\" -e \"SELECT COALESCE(GROUP_CONCAT(table_name ORDER BY table_name SEPARATOR ','), '') FROM information_schema.tables WHERE table_schema='${database}'\"")"
 
   if [[ "${actual}" != "${expected_tables[${database}]}" ]]; then
     echo "Table ownership violation in ${database}." >&2

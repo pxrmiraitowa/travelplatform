@@ -686,7 +686,7 @@ jobs:
         run: bash scripts/health-check.sh | tee artifacts/kubernetes-health-check.log
 
       - name: Verify database table ownership
-        run: bash scripts/verify-table-ownership.sh | tee artifacts/database-table-ownership.log
+        run: bash scripts/verify-table-ownership.sh 2>&1 | tee artifacts/database-table-ownership.log
 
       - name: Run deployed API and business E2E regression tests
         working-directory: travel-platform-web
