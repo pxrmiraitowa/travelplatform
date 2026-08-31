@@ -21,6 +21,23 @@ command -v kubectl >/dev/null 2>&1 || {
   exit 1
 }
 
+apply_manifest_with_image() {
+  local manifest="$1"
+  local placeholder_image="$2"
+  local deployment_image="$3"
+
+  # Render the real versioned image before the Deployment is first created.
+  # Applying the placeholder and updating it afterwards briefly creates an
+  # ImagePullBackOff Pod that can interfere with deployment health checks.
+  if ! grep -Fq "image: ${placeholder_image}" "${manifest}"; then
+    echo "Expected placeholder image ${placeholder_image} was not found in ${manifest}." >&2
+    exit 1
+  fi
+
+  sed "s|image: ${placeholder_image}|image: ${deployment_image}|" "${manifest}" \
+    | kubectl apply -f -
+}
+
 kubectl apply -f "${REPO_ROOT}/deploy/k8s/namespace.yaml"
 
 kubectl --namespace "${NAMESPACE}" create secret generic travel-platform-secrets \
@@ -43,16 +60,18 @@ kubectl apply -f "${REPO_ROOT}/deploy/k8s/mysql.yaml"
 echo "Waiting for MySQL and database initialization..."
 kubectl --namespace "${NAMESPACE}" rollout status statefulset/mysql --timeout=240s
 
-kubectl apply -f "${REPO_ROOT}/deploy/k8s/backend.yaml"
-kubectl --namespace "${NAMESPACE}" set image deployment/backend \
-  backend="${BACKEND_IMAGE}:${IMAGE_TAG}"
+apply_manifest_with_image \
+  "${REPO_ROOT}/deploy/k8s/backend.yaml" \
+  "travel-platform-server:0.1.0" \
+  "${BACKEND_IMAGE}:${IMAGE_TAG}"
 
 echo "Waiting for backend rollout..."
 kubectl --namespace "${NAMESPACE}" rollout status deployment/backend --timeout=300s
 
-kubectl apply -f "${REPO_ROOT}/deploy/k8s/frontend.yaml"
-kubectl --namespace "${NAMESPACE}" set image deployment/frontend \
-  frontend="${FRONTEND_IMAGE}:${IMAGE_TAG}"
+apply_manifest_with_image \
+  "${REPO_ROOT}/deploy/k8s/frontend.yaml" \
+  "travel-platform-web:0.1.0" \
+  "${FRONTEND_IMAGE}:${IMAGE_TAG}"
 
 echo "Waiting for frontend rollout..."
 kubectl --namespace "${NAMESPACE}" rollout status deployment/frontend --timeout=180s

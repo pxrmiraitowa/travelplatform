@@ -18,8 +18,10 @@ command -v curl >/dev/null 2>&1 || {
 kubectl --namespace "${NAMESPACE}" rollout status statefulset/mysql --timeout=60s
 kubectl --namespace "${NAMESPACE}" rollout status deployment/backend --timeout=60s
 kubectl --namespace "${NAMESPACE}" rollout status deployment/frontend --timeout=60s
-kubectl --namespace "${NAMESPACE}" wait \
-  --for=condition=Ready pod --all --timeout=60s
+
+# The controller rollout checks above target only the active revision. Waiting
+# on every Pod can capture a superseded Pod that is already terminating and
+# incorrectly fail an otherwise healthy rolling deployment.
 
 frontend_health="$(curl --fail --silent --show-error \
   --retry 20 --retry-delay 3 --retry-all-errors \
@@ -47,4 +49,3 @@ echo "Deployed images:"
 kubectl --namespace "${NAMESPACE}" get deployments \
   --output=jsonpath='{range .items[*]}{.metadata.name}{"="}{.spec.template.spec.containers[0].image}{"\n"}{end}'
 echo "Kubernetes health checks passed."
-
