@@ -638,7 +638,9 @@ jobs:
 
       - name: Install regression-test dependencies
         working-directory: travel-platform-web
-        run: npm ci | tee ../artifacts/frontend-regression-dependencies.log
+        run: |
+          npm ci | tee ../artifacts/frontend-regression-dependencies.log
+          npx playwright install --with-deps chromium
 
       - name: Log in to GHCR for deployment
         uses: docker/login-action@v4
