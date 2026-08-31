@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <style>
+      .title { font: 700 34px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #172033; }
+      .subtitle { font: 400 18px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #60708a; }
+      .service-name { font: 700 24px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #ffffff; }
+      .service-desc { font: 400 16px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #eaf2ff; }
+      .db-name { font: 700 22px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #24324a; }
+      .db-desc { font: 400 15px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #5f6f86; }
+      .edge-label { font: 600 15px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #26344d; }
+      .section { font: 700 18px "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #58677d; letter-spacing: 2px; }
+    </style>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#24324a" flood-opacity="0.16"/>
+    </filter>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2575d8"/>
+    </marker>
+    <marker id="arrow-orange" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#e7792b"/>
+    </marker>
+    <marker id="arrow-purple" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7957c8"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="900" fill="#f7f9fc"/>
+  <text x="800" y="52" text-anchor="middle" class="title">出行旅游平台微服务划分与跨服务调用</text>
+  <text x="800" y="82" text-anchor="middle" class="subtitle">四个业务服务独立拥有数据，跨领域协作仅通过 HTTP 接口完成</text>
+
+  <text x="55" y="125" class="section">业务服务层</text>
+
+  <!-- Top row: four services -->
+  <g filter="url(#shadow)">
+    <rect x="55" y="145" width="330" height="135" rx="18" fill="#3568b8"/>
+    <rect x="425" y="145" width="330" height="135" rx="18" fill="#168a83"/>
+    <rect x="795" y="145" width="330" height="135" rx="18" fill="#d16b2f"/>
+    <rect x="1165" y="145" width="380" height="135" rx="18" fill="#7555b7"/>
+  </g>
+
+  <text x="220" y="184" text-anchor="middle" class="service-name">user-service</text>
+  <text x="220" y="216" text-anchor="middle" class="service-desc">认证 · 用户 · 角色 · 联系人</text>
+  <text x="220" y="244" text-anchor="middle" class="service-desc">账号与身份安全边界</text>
+
+  <text x="590" y="184" text-anchor="middle" class="service-name">product-service</text>
+  <text x="590" y="216" text-anchor="middle" class="service-desc">航班 · 车次 · 酒店 · 旅游产品</text>
+  <text x="590" y="244" text-anchor="middle" class="service-desc">价格 · 优惠券 · 库存 · 景点</text>
+
+  <text x="960" y="184" text-anchor="middle" class="service-name">order-service</text>
+  <text x="960" y="216" text-anchor="middle" class="service-desc">统一订单 · 商品快照 · 状态机</text>
+  <text x="960" y="244" text-anchor="middle" class="service-desc">取消 · 支付 · 退款</text>
+
+  <text x="1355" y="184" text-anchor="middle" class="service-name">content-trip-service</text>
+  <text x="1355" y="216" text-anchor="middle" class="service-desc">行程 · 分享 · 评价 · 价格提醒</text>
+  <text x="1355" y="244" text-anchor="middle" class="service-desc">旅行内容与规划领域</text>
+
+  <!-- Ownership lines, intentionally light and behind service calls -->
+  <g fill="none" stroke="#aeb9c9" stroke-width="3" stroke-dasharray="8 7">
+    <path d="M220 280 V690"/>
+    <path d="M590 280 V690"/>
+    <path d="M960 280 V690"/>
+    <path d="M1355 280 V690"/>
+  </g>
+
+  <text x="55" y="325" class="section">跨服务 HTTP 调用</text>
+
+  <!-- content-trip-service -> user-service -->
+  <path d="M1285 280 V350 H250 V280" fill="none" stroke="#2575d8" stroke-width="4" marker-end="url(#arrow-blue)"/>
+  <rect x="490" y="331" width="205" height="35" rx="17" fill="#eef6ff" stroke="#80b5ee"/>
+  <text x="592" y="354" text-anchor="middle" class="edge-label">用户基础信息查询</text>
+
+  <!-- order-service -> product-service -->
+  <path d="M990 280 V420 H620 V280" fill="none" stroke="#e7792b" stroke-width="4" marker-end="url(#arrow-orange)"/>
+  <rect x="683" y="401" width="240" height="35" rx="17" fill="#fff4eb" stroke="#efaa76"/>
+  <text x="803" y="424" text-anchor="middle" class="edge-label">商品快照、库存扣减/恢复</text>
+
+  <!-- content-trip-service -> order-service -->
+  <path d="M1320 280 V490 H1010 V280" fill="none" stroke="#7957c8" stroke-width="4" marker-end="url(#arrow-purple)"/>
+  <rect x="1058" y="471" width="225" height="35" rx="17" fill="#f3effc" stroke="#a894d8"/>
+  <text x="1170" y="494" text-anchor="middle" class="edge-label">评价资格与订单状态</text>
+
+  <!-- content-trip-service -> product-service -->
+  <path d="M1390 280 V560 H650 V280" fill="none" stroke="#168a83" stroke-width="4" marker-end="url(#arrow-blue)"/>
+  <rect x="860" y="541" width="255" height="35" rx="17" fill="#eaf8f6" stroke="#72beb8"/>
+  <text x="987" y="564" text-anchor="middle" class="edge-label">景点、商品价格与提醒数据</text>
+
+  <text x="55" y="655" class="section">服务专属数据库</text>
+
+  <!-- Bottom row: four databases -->
+  <g filter="url(#shadow)">
+    <rect x="55" y="690" width="330" height="125" rx="16" fill="#ffffff" stroke="#3568b8" stroke-width="3"/>
+    <rect x="425" y="690" width="330" height="125" rx="16" fill="#ffffff" stroke="#168a83" stroke-width="3"/>
+    <rect x="795" y="690" width="330" height="125" rx="16" fill="#ffffff" stroke="#d16b2f" stroke-width="3"/>
+    <rect x="1165" y="690" width="380" height="125" rx="16" fill="#ffffff" stroke="#7555b7" stroke-width="3"/>
+  </g>
+
+  <text x="220" y="730" text-anchor="middle" class="db-name">用户库</text>
+  <text x="220" y="760" text-anchor="middle" class="db-desc">user · role · user_role</text>
+  <text x="220" y="786" text-anchor="middle" class="db-desc">user_contact</text>
+
+  <text x="590" y="730" text-anchor="middle" class="db-name">产品库</text>
+  <text x="590" y="760" text-anchor="middle" class="db-desc">flight · train · hotel · room</text>
+  <text x="590" y="786" text-anchor="middle" class="db-desc">tour · attraction · coupon</text>
+
+  <text x="960" y="730" text-anchor="middle" class="db-name">订单库</text>
+  <text x="960" y="760" text-anchor="middle" class="db-desc">orders · order_snapshot</text>
+  <text x="960" y="786" text-anchor="middle" class="db-desc">payment_refund_record</text>
+
+  <text x="1355" y="730" text-anchor="middle" class="db-name">内容行程库</text>
+  <text x="1355" y="760" text-anchor="middle" class="db-desc">trip_plan · trip_item · share</text>
+  <text x="1355" y="786" text-anchor="middle" class="db-desc">review · price_alert</text>
+
+  <g font-family="Microsoft YaHei, Noto Sans CJK SC, sans-serif" font-size="15" fill="#68778c">
+    <line x1="55" y1="854" x2="105" y2="854" stroke="#aeb9c9" stroke-width="3" stroke-dasharray="8 7"/>
+    <text x="116" y="859">服务只读写自己的数据库</text>
+    <line x1="390" y1="854" x2="440" y2="854" stroke="#2575d8" stroke-width="4"/>
+    <text x="451" y="859">跨服务调用（箭头指向被调用方）</text>
+  </g>
+</svg>
