@@ -13,7 +13,10 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     clearMocks: true,
-    include: ['src/**/*.{test,spec}.{js,ts}'],
+    include: [
+      'src/**/*.{test,spec}.{js,ts}',
+      'regression/**/*.{test,spec}.{js,ts}'
+    ],
     exclude: ['tests/e2e/**']
   },
   server: {
