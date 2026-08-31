@@ -7,6 +7,12 @@
 */dist/
 **/dist/
 *.log
+__pycache__/
+*.pyc
 start-dev-local.ps1
 start-dev-local.cmd
 travel-platform-microservices/build/
+artifacts/member-e/
+experiments/results/*
+!experiments/results/README.md
+!experiments/results/latest-evidence-index.json

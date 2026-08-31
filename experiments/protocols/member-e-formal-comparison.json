@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "authorization": "user-requested-official-stage-1-and-stage-2-member-e-work-on-2026-08-31",
+  "sourceRevision": "aece11988e2364289625c0de2c75b18444c55b8d",
+  "repositoryHeadAtAuthorization": "aece11988e2364289625c0de2c75b18444c55b8d",
+  "context": "kind-travel-platform",
+  "namespaces": {
+    "monolith": "travel-platform-bench-monolith",
+    "microservices": "travel-platform-bench-micro"
+  },
+  "ports": {
+    "monolith": 8091,
+    "microservices": 8092
+  },
+  "endpoints": [
+    {"name": "flights", "path": "/api/public/flights?pageNum=1&pageSize=10", "datasetPath": "/api/public/flights?pageNum=1&pageSize=50"},
+    {"name": "hotels", "path": "/api/public/hotels?pageNum=1&pageSize=10", "datasetPath": "/api/public/hotels?pageNum=1&pageSize=50"},
+    {"name": "tours", "path": "/api/public/tours?pageNum=1&pageSize=10", "datasetPath": "/api/public/tours?pageNum=1&pageSize=50"}
+  ],
+  "order": ["monolith", "microservices", "microservices", "monolith", "monolith", "microservices"],
+  "runsPerVariant": 3,
+  "virtualUsers": 30,
+  "warmupSecondsPerRun": 30,
+  "measurementSecondsPerRun": 60,
+  "sleepSeconds": 0.05,
+  "delaySecondsBetweenRuns": 10,
+  "metricIntervalSeconds": 5,
+  "replicasPerDeployment": 1,
+  "hpaEnabled": false,
+  "budgetPerVariant": {
+    "cpuRequestMillicores": 1600,
+    "memoryRequestMi": 1920,
+    "cpuLimitMillicores": 6500,
+    "memoryLimitMi": 5120
+  },
+  "scope": "On one local Kind node, compare three public read-only catalog endpoints with identical data, fixed replicas, equal aggregate requests/limits, alternating order and three measured runs per architecture. This is not a maximum-capacity test and does not prove that either architecture is universally faster."
+}

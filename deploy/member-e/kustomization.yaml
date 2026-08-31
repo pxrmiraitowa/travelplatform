@@ -1,0 +1,138 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: travel-platform-micro-team
+resources:
+  - ../k8s
+  - namespace.yaml
+  - storage.yaml
+  - hpa.yaml
+commonAnnotations:
+  lab.travelplatform/source-revision: aece11988e2364289625c0de2c75b18444c55b8d
+configMapGenerator:
+  - name: member-e-runtime
+    literals:
+      - SERVICE_VERSION=sha-aece11988e23
+      - SERVER_SHUTDOWN=graceful
+      - SPRING_LIFECYCLE_TIMEOUT_PER_SHUTDOWN_PHASE=20s
+      - JAVA_TOOL_OPTIONS=-XX:MaxRAMPercentage=75.0
+generatorOptions:
+  disableNameSuffixHash: true
+images:
+  - name: travel-platform-user-service
+    newName: travel-platform-benchmark-user-service
+    newTag: aece119-e77c62434019
+  - name: travel-platform-product-service
+    newName: travel-platform-benchmark-product-service
+    newTag: aece119-cd7f630c9c49
+  - name: travel-platform-order-service
+    newName: travel-platform-benchmark-order-service
+    newTag: aece119-7dd6101bfaf1
+  - name: travel-platform-content-trip-service
+    newName: travel-platform-benchmark-content-trip-service
+    newTag: aece119-a2cb3d7b0757
+  - name: travel-platform-gateway-service
+    newName: travel-platform-benchmark-gateway-service
+    newTag: aece119-e2d709fd7bf0
+  - name: travel-platform-web
+    newName: travel-platform-benchmark-frontend
+    newTag: aece119-92ea79c105aa
+patches:
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests: {cpu: 250m, memory: 512Mi}
+          limits: {cpu: "1", memory: 1Gi}
+      - op: add
+        path: /spec/template/spec/containers/0/envFrom
+        value:
+          - configMapRef: {name: member-e-runtime}
+      - op: add
+        path: /spec/template/spec/terminationGracePeriodSeconds
+        value: 30
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
+      - op: add
+        path: /spec/strategy
+        value:
+          type: RollingUpdate
+          rollingUpdate: {maxUnavailable: 0, maxSurge: 1}
+  - target:
+      kind: Deployment
+      name: frontend
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests: {cpu: 100m, memory: 128Mi}
+          limits: {cpu: 500m, memory: 256Mi}
+  - target:
+      kind: Service
+      name: frontend
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      kind: StatefulSet
+      name: mysql
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/volumes
+        value:
+          - name: mysql-data
+            persistentVolumeClaim: {claimName: mysql-data}
+      - op: add
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests: {cpu: 250m, memory: 512Mi}
+          limits: {cpu: "1", memory: 1Gi}
+  - target:
+      kind: Deployment
+      name: product-service
+    patch: |-
+      - op: add
+        path: /spec/template/spec/securityContext
+        value: {fsGroup: 10001}
+      - op: add
+        path: /spec/template/spec/containers/0/volumeMounts
+        value:
+          - name: product-uploads
+            mountPath: /app/uploads
+      - op: add
+        path: /spec/template/spec/volumes
+        value:
+          - name: product-uploads
+            persistentVolumeClaim: {claimName: product-uploads}
+  - target:
+      kind: Deployment
+      name: content-trip-service
+    patch: |-
+      - op: add
+        path: /spec/template/spec/securityContext
+        value: {fsGroup: 10001}
+      - op: replace
+        path: /spec/template/spec/volumes
+        value:
+          - name: content-uploads
+            persistentVolumeClaim: {claimName: content-uploads}
+  - target:
+      kind: Job
+      name: db-init
+    patch: |-
+      - op: replace
+        path: /spec/backoffLimit
+        value: 0
+      - op: add
+        path: /spec/activeDeadlineSeconds
+        value: 600
+      - op: add
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests: {cpu: 250m, memory: 512Mi}
+          limits: {cpu: "1", memory: 1Gi}

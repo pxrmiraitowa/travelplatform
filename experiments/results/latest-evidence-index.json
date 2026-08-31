@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-31T15:45:00+08:00",
+  "status": "complete",
+  "sourceRevision": "aece11988e2364289625c0de2c75b18444c55b8d",
+  "branch": "codex/microservices-ci-integration",
+  "evidenceRoot": "artifacts/member-e/aece119",
+  "deliveryArchive": {
+    "file": "成员E-最新版原始证据-aece119-20260831.zip",
+    "bytes": 34677553,
+    "sha256": "279A7B1C9FA94820D9BD86A93D3C2CE788D1ED4737006ACE868CC36566EF4D41"
+  },
+  "evidence": {
+    "monolithBuild": "monolith-build-20260831-144936-9c1e86fc",
+    "microservicesBuild": "microservices-build-20260831-145433-737dccd9",
+    "preparedDeployment": "comparison-20260831-145843-fcb99b5a",
+    "hpa": "hpa-20260831-150941-2bb28d",
+    "dependencyFault": "dependency-fault-20260831-152825-244f7932",
+    "formalComparison": "formal-comparison-20260831-151647-bc02e426"
+  },
+  "tests": {
+    "monolith": { "passed": 139, "failed": 0, "errors": 0, "skipped": 0 },
+    "microservicesJava": { "passed": 13, "failed": 0 },
+    "frontend": { "files": 6, "passed": 16, "failed": 0, "productionBuildPassed": true }
+  },
+  "hpa": {
+    "status": "Verified",
+    "minimumReplicas": 1,
+    "maximumObservedReadyReplicas": 5,
+    "returnedToMinimum": true,
+    "sampleCount": 54
+  },
+  "fault": {
+    "status": "Passed",
+    "checksPassed": 8,
+    "checksFailed": 0,
+    "expectedMessage": "商品服务暂不可用，请稍后重试",
+    "recovered": true
+  },
+  "performance": {
+    "runsPerVariant": 3,
+    "virtualUsers": 30,
+    "monolith": { "qps": 311.0577460945999, "averageMs": 52.55975606519551, "p95Ms": 283.9310322333333, "cpuMillicores": 1121.0333333333333, "memoryMi": 794.4 },
+    "microservices": { "qps": 324.36743867165546, "averageMs": 49.3271691197124, "p95Ms": 260.69283945, "cpuMillicores": 1302.5, "memoryMi": 1272.7333333333333 },
+    "allHttpAndBusinessErrorRatesZero": true
+  },
+  "visualEvidence": [
+    { "file": "docs/images/member-e/member-e-hpa-timeline-aece119.png", "sha256": "C3D4EA3B11E1D49377D94EF53AF748C9E5B8B6F89D54AD347E6DBDCE0B255DA5" },
+    { "file": "docs/images/member-e/member-e-dependency-fault-aece119.png", "sha256": "258602BBF5D8859007286F490E1484E6B08DB08D06207F50317D284BFA14F1D9" },
+    { "file": "docs/images/member-e/member-e-performance-comparison-aece119.png", "sha256": "527B4379377D91B4C40630DDB7559CABAE0E6CAEC2D033851CC632C8130A8ADC" }
+  ],
+  "secretValuesIncluded": false
+}
