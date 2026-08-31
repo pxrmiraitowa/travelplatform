@@ -379,6 +379,8 @@ jobs:
 
       - name: Start frontend for browser E2E tests
         working-directory: travel-platform-web
+        env:
+          VITE_API_PROXY_TARGET: http://127.0.0.1:8080
         shell: bash
         run: |
           nohup npm run dev -- --host 127.0.0.1 > ../artifacts/browser-e2e-frontend.log 2>&1 &
