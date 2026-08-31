@@ -15,6 +15,11 @@ on:
         required: false
         default: false
         type: boolean
+      run_rollback_drill:
+        description: Create and roll back a gateway revision, then verify service health
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -753,6 +758,31 @@ jobs:
       - name: Run optional deployment failure drill
         if: github.event_name == 'workflow_dispatch' && inputs.run_failure_drill
         run: bash scripts/failure-drill.sh | tee artifacts/deployment-failure-drill.log
+
+      - name: Run optional Kubernetes rollback drill
+        if: github.event_name == 'workflow_dispatch' && inputs.run_rollback_drill
+        shell: bash
+        run: |
+          set -o pipefail
+          marker="run-${GITHUB_RUN_ID}"
+
+          kubectl --namespace travel-platform set env deployment/gateway-service \
+            ROLLBACK_DRILL_MARKER="${marker}"
+          kubectl --namespace travel-platform rollout status deployment/gateway-service \
+            --timeout=180s
+
+          ROLLBACK_ARTIFACT_DIR=artifacts/rollback \
+            bash scripts/rollback-kind.sh gateway-service \
+            | tee artifacts/kubernetes-rollback-drill.log
+
+          if kubectl --namespace travel-platform get deployment/gateway-service \
+            --output=jsonpath='{.spec.template.spec.containers[?(@.name=="gateway-service")].env[*].name}' \
+            | grep -qw ROLLBACK_DRILL_MARKER; then
+            echo "Rollback drill marker is still present after rollback." >&2
+            exit 1
+          fi
+
+          echo "Rollback drill restored the previous gateway revision successfully."
 
       - name: Collect Docker and Kubernetes diagnostics
         if: always()

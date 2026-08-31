@@ -20,6 +20,22 @@ command -v kubectl >/dev/null 2>&1 || {
   exit 1
 }
 
+apply_manifest_with_image() {
+  local manifest="$1"
+  local placeholder_image="$2"
+  local deployment_image="$3"
+
+  if ! grep -Fq "image: ${placeholder_image}" "${manifest}"; then
+    echo "Expected placeholder image ${placeholder_image} was not found in ${manifest}." >&2
+    exit 1
+  fi
+
+  # Apply the real versioned image in one operation so the placeholder never
+  # becomes a Kubernetes rollout revision. This keeps rollback history usable.
+  sed "s|image: ${placeholder_image}|image: ${deployment_image}|" "${manifest}" \
+    | kubectl apply -f -
+}
+
 kubectl apply -f "${REPO_ROOT}/deploy/k8s/namespace.yaml"
 
 kubectl --namespace "${NAMESPACE}" create secret generic travel-platform-secrets \
@@ -48,34 +64,40 @@ kubectl --namespace "${NAMESPACE}" wait \
   --for=condition=complete job/db-init \
   --timeout=300s
 
-kubectl apply -f "${REPO_ROOT}/deploy/k8s/user-service.yaml"
-kubectl --namespace "${NAMESPACE}" set image deployment/user-service \
-  user-service="${IMAGE_PREFIX}-user-service:${IMAGE_TAG}"
+apply_manifest_with_image \
+  "${REPO_ROOT}/deploy/k8s/user-service.yaml" \
+  "travel-platform-user-service:0.1.0" \
+  "${IMAGE_PREFIX}-user-service:${IMAGE_TAG}"
 kubectl --namespace "${NAMESPACE}" rollout status deployment/user-service --timeout=300s
 
-kubectl apply -f "${REPO_ROOT}/deploy/k8s/product-service.yaml"
-kubectl --namespace "${NAMESPACE}" set image deployment/product-service \
-  product-service="${IMAGE_PREFIX}-product-service:${IMAGE_TAG}"
+apply_manifest_with_image \
+  "${REPO_ROOT}/deploy/k8s/product-service.yaml" \
+  "travel-platform-product-service:0.1.0" \
+  "${IMAGE_PREFIX}-product-service:${IMAGE_TAG}"
 kubectl --namespace "${NAMESPACE}" rollout status deployment/product-service --timeout=300s
 
-kubectl apply -f "${REPO_ROOT}/deploy/k8s/order-service.yaml"
-kubectl --namespace "${NAMESPACE}" set image deployment/order-service \
-  order-service="${IMAGE_PREFIX}-order-service:${IMAGE_TAG}"
+apply_manifest_with_image \
+  "${REPO_ROOT}/deploy/k8s/order-service.yaml" \
+  "travel-platform-order-service:0.1.0" \
+  "${IMAGE_PREFIX}-order-service:${IMAGE_TAG}"
 kubectl --namespace "${NAMESPACE}" rollout status deployment/order-service --timeout=300s
 
-kubectl apply -f "${REPO_ROOT}/deploy/k8s/content-trip-service.yaml"
-kubectl --namespace "${NAMESPACE}" set image deployment/content-trip-service \
-  content-trip-service="${IMAGE_PREFIX}-content-trip-service:${IMAGE_TAG}"
+apply_manifest_with_image \
+  "${REPO_ROOT}/deploy/k8s/content-trip-service.yaml" \
+  "travel-platform-content-trip-service:0.1.0" \
+  "${IMAGE_PREFIX}-content-trip-service:${IMAGE_TAG}"
 kubectl --namespace "${NAMESPACE}" rollout status deployment/content-trip-service --timeout=300s
 
-kubectl apply -f "${REPO_ROOT}/deploy/k8s/gateway-service.yaml"
-kubectl --namespace "${NAMESPACE}" set image deployment/gateway-service \
-  gateway-service="${IMAGE_PREFIX}-gateway-service:${IMAGE_TAG}"
+apply_manifest_with_image \
+  "${REPO_ROOT}/deploy/k8s/gateway-service.yaml" \
+  "travel-platform-gateway-service:0.1.0" \
+  "${IMAGE_PREFIX}-gateway-service:${IMAGE_TAG}"
 kubectl --namespace "${NAMESPACE}" rollout status deployment/gateway-service --timeout=300s
 
-kubectl apply -f "${REPO_ROOT}/deploy/k8s/frontend.yaml"
-kubectl --namespace "${NAMESPACE}" set image deployment/frontend \
-  frontend="${IMAGE_PREFIX}-web:${IMAGE_TAG}"
+apply_manifest_with_image \
+  "${REPO_ROOT}/deploy/k8s/frontend.yaml" \
+  "travel-platform-web:0.1.0" \
+  "${IMAGE_PREFIX}-web:${IMAGE_TAG}"
 kubectl --namespace "${NAMESPACE}" rollout status deployment/frontend --timeout=180s
 
 kubectl --namespace "${NAMESPACE}" get pods,services
