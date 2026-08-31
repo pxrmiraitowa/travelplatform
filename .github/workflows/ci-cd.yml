@@ -520,13 +520,19 @@ jobs:
           kind load docker-image "${FRONTEND_IMAGE}:${IMAGE_TAG}" --name "${KIND_CLUSTER_NAME}"
 
       - name: Deploy to Kubernetes
+        shell: bash
         env:
           MYSQL_ROOT_PASSWORD: ${{ env.CI_DB_PASSWORD }}
           JWT_SECRET: ${{ env.CI_JWT_SECRET }}
-        run: bash scripts/deploy-kind.sh | tee artifacts/kubernetes-deploy.log
+        run: |
+          set -o pipefail
+          bash scripts/deploy-kind.sh | tee artifacts/kubernetes-deploy.log
 
       - name: Run Kubernetes health checks
-        run: bash scripts/health-check.sh | tee artifacts/kubernetes-health-check.log
+        shell: bash
+        run: |
+          set -o pipefail
+          bash scripts/health-check.sh | tee artifacts/kubernetes-health-check.log
 
       - name: Collect Docker and Kubernetes diagnostics
         if: always()
