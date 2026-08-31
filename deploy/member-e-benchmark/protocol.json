@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sourceRevision": "aece11988e2364289625c0de2c75b18444c55b8d",
+  "context": "kind-travel-platform",
+  "namespaces": {"monolith": "travel-platform-bench-monolith", "microservices": "travel-platform-bench-micro"},
+  "ports": {"monolith": 8091, "microservices": 8092},
+  "targetPath": "/api/public/flights?pageNum=1&pageSize=10",
+  "datasetCheckPath": "/api/public/flights?pageNum=1&pageSize=50",
+  "order": ["monolith", "microservices", "microservices", "monolith", "monolith", "microservices"],
+  "virtualUsers": 30,
+  "warmupSecondsPerRun": 30,
+  "measurementSecondsPerRun": 60,
+  "sleepSeconds": 0.05,
+  "delaySecondsBetweenRuns": 10,
+  "replicasPerDeployment": 1,
+  "hpaEnabled": false,
+  "budgetPerVariant": {"cpuRequestMillicores": 1600, "memoryRequestMi": 1920, "cpuLimitMillicores": 6500, "memoryLimitMi": 5120},
+  "javaPerMicroservice": {"cpuRequest": "250m", "memoryRequest": "256Mi", "cpuLimit": "1", "memoryLimit": "768Mi"},
+  "javaMonolith": {"cpuRequest": "1250m", "memoryRequest": "1280Mi", "cpuLimit": "5", "memoryLimit": "3840Mi"},
+  "reviewStatus": "awaiting-team-review",
+  "scope": "Read-only flight-list comparison with equal aggregate requests/limits. Not maximum capacity, not all business flows, and not proof that one architecture is universally faster."
+}
