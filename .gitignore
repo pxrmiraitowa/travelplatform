@@ -13,9 +13,15 @@ start-dev-local.ps1
 start-dev-local.cmd
 travel-platform-microservices/build/
 artifacts/member-e/
+<<<<<<< HEAD
+experiments/results/*
+!experiments/results/README.md
+!experiments/results/latest-evidence-index.json
+=======
 /tmp/
 experiments/results/*
 !experiments/results/README.md
 !experiments/results/latest-evidence-index.json
 !experiments/results/成员E-原始证据说明.md
 !experiments/results/成员E-最新版原始证据-aece119-20260831.zip
+>>>>>>> github/codex/microservices-ci-integration
