@@ -33,19 +33,38 @@
 - JDK 17
 - Maven 3.9+
 - MySQL 8.x
-- Node.js 18+
+- Node.js 20.19+
+- npm 10+
+- 可选：Docker Desktop 与 Docker Compose v2（用于容器化微服务启动）
+
+项目中的主要框架版本为 Spring Boot 3.3.5、Vue 3.5.x 和 Vite 5.4.x。Node.js 20.19+ 同时满足前端开发、Vitest、Playwright 和 jsdom 的运行要求。
 
 ## 4. 快速启动
 
-### 4.1 推荐：一键启动前后端
+### 4.1 推荐：本地启动单体后端与前端
+
+首次启动前，先启动 MySQL，并创建空数据库：
+
+```powershell
+mysql -uroot -p -e "CREATE DATABASE IF NOT EXISTS travel_platform CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+```
+
+默认数据库用户为 `root`，密码为 `123456`。如本机配置不同，请同步修改 `travel-platform-server/src/main/resources/application.yml`。
+
+首次启动前端时还需要安装依赖：
+
+```powershell
+cd travel-platform-web
+npm install
+cd ..
+```
 
 项目根目录提供了通用启动脚本：
 
 - `start-dev.ps1`
 - `start-dev.cmd`
 
-通用脚本用于普通联调，不携带本地第三方 AI 密钥。  
-如果你需要在自己电脑上带环境变量启动第三方 AI，可以基于通用脚本复制一份本地专用脚本，例如 `start-dev-local.ps1`、`start-dev-local.cmd`，并把它们加入 `.gitignore`，避免真实密钥进入仓库。
+启动脚本用于普通联调，不携带第三方 AI 密钥。如需启用第三方 AI，请在运行脚本前按第 7.3 节设置环境变量。
 
 脚本会自动：
 
@@ -53,6 +72,8 @@
 - 分别打开前后端终端窗口
 - 启动后端 `mvn spring-boot:run`
 - 启动前端 `npm run dev`
+
+脚本不会启动 MySQL、创建数据库或执行 `npm install`，这些首次运行步骤需要先手动完成。
 
 PowerShell 启动通用版本：
 
@@ -66,22 +87,11 @@ Windows 命令行启动通用版本：
 start-dev.cmd
 ```
 
-PowerShell 启动本地 AI 本地专用版本：
-
-```powershell
-.\start-dev-local.ps1
-```
-
-Windows 命令行启动本地 AI 本地专用版本：
-
-```text
-start-dev-local.cmd
-```
-
 启动成功后访问：
 
 - 前端首页：[http://localhost:5173](http://localhost:5173)
 - 后端接口：[http://localhost:8080](http://localhost:8080)
+- 健康检查：[http://localhost:8080/api/public/health](http://localhost:8080/api/public/health)
 - Swagger：[http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
 
 ### 4.2 单独启动后端
@@ -108,9 +118,10 @@ mvn spring-boot:run
 
 说明：
 
-- 项目启动时会自动执行 `schema.sql` 和 `ai_trip_plan.sql`
-- 会自动建表并补充默认演示数据
-- 景点初始化采用幂等方式，不会因重启自动清空 `attraction` 表
+- `travel_platform` 数据库需要预先存在，应用不会自动创建数据库
+- 项目启动时会自动执行 `sql/schema.sql` 和 `sql/data-demo.sql`
+- `sql/ai_trip_plan.sql` 只保留兼容说明，AI 行程表结构和景点数据已分别合并到上述两个初始化脚本中
+- 初始化 SQL 采用幂等写法，重启应用不会清空现有业务数据
 - 本地上传图片默认保存在后端目录下的 `uploads/`
 
 如果你本地使用高版本 JDK，也可以先打包后再启动：
@@ -144,26 +155,82 @@ npm run dev
 前端已配置代理：
 
 - `/api` 会代理到 `http://localhost:8080`
+- 如需联调本地微服务网关，可在启动前执行 `$env:VITE_API_PROXY_TARGET="http://localhost:8000"`
+
+### 4.4 使用 Docker Compose 启动微服务版
+
+微服务版会启动 MySQL、数据库初始化任务、4 个业务服务、网关和 Nginx 前端。在项目根目录运行：
+
+```powershell
+docker compose up --build -d
+docker compose ps
+```
+
+首次启动会下载镜像和 Maven/npm 依赖，需要等待各业务服务的状态变为 `healthy`，`db-init` 的状态变为 `Exited (0)`。默认端口可在根目录 `.env` 中修改：
+
+| 组件 | 默认地址/端口 |
+| --- | --- |
+| 前端 | [http://localhost:8088](http://localhost:8088) |
+| API 网关 | [http://localhost:8000](http://localhost:8000) |
+| MySQL | `localhost:3307` |
+| 用户服务 | `8101` |
+| 产品服务 | `8102` |
+| 订单服务 | `8103` |
+| 内容与行程服务 | `8104` |
+
+微服务健康检查：
+
+- 前端 Nginx：[http://localhost:8088/healthz](http://localhost:8088/healthz)
+- API 网关：[http://localhost:8000/api/public/health](http://localhost:8000/api/public/health)
+- 用户服务：[http://localhost:8101/api/public/health](http://localhost:8101/api/public/health)
+- 产品服务：[http://localhost:8102/api/public/health](http://localhost:8102/api/public/health)
+- 订单服务：[http://localhost:8103/api/public/health](http://localhost:8103/api/public/health)
+- 内容与行程服务：[http://localhost:8104/api/public/health](http://localhost:8104/api/public/health)
+
+停止微服务容器：
+
+```powershell
+docker compose down
+```
+
+`docker compose down` 不会删除 MySQL 数据卷；后续重新启动时数据会保留。
 
 ## 5. 默认演示账号
 
-普通用户：
+| 启动模式 | 角色 | 用户名 | 密码 | 登录入口 |
+| --- | --- | --- | --- | --- |
+| 单体后端 | 普通用户 | `demo_user` | `123456` | `/login` |
+| 单体后端 | 管理员 | `admin` | `Admin123456` | `/admin/login` |
+| Docker Compose 微服务 | 普通用户 | `demo_user` | `123456` | `/login` |
+| Docker Compose 微服务 | 管理员 | `admin` | `123456` | `/admin/login` |
 
-- 用户名：`demo_user`
-- 密码：`123456`
+上述账号仅用于本地演示和自动化测试，不得用于真实生产环境。
 
-管理员：
+## 6. 初始数据
 
-- 用户名：`admin`
-- 密码：`Admin123456`
+单体后端的建表脚本是 `travel-platform-server/src/main/resources/sql/schema.sql`，演示数据脚本是 `travel-platform-server/src/main/resources/sql/data-demo.sql`。在 `travel_platform` 数据库已存在的前提下，Spring Boot 每次启动都会检查表结构并幂等补充缺失的演示数据。
 
-## 6. AI 行程规划说明
+默认数据包括：
 
-### 6.1 功能位置
+- `ROLE_USER`、`ROLE_ADMIN` 角色与第 5 节中的两个演示账号
+- `demo_user` 的默认出行人“张三”
+- 3 个演示航班，包含 2030-07-01 上海到北京的 `MU5101`、`CA1832`
+- 2 个演示车次，包含 2030-07-03 上海虹桥到杭州东的 `G1024`
+- 2 家上海演示酒店及 4 种房型
+- “三亚自由行4天3晚”和“丽江慢游6天5晚”两个旅游产品
+- 酒店、机票和旅游产品优惠券
+- 上海外滩、北京故宫、杭州西湖景点数据
+- `demo_user` 的酒店和航班价格提醒
+
+初始化不会主动清空已有数据，也不会覆盖已存在的同名演示账号。Docker Compose 微服务版会由 `db-init` 容器将同一套表结构和演示数据拆分初始化到各服务数据库。
+
+## 7. AI 行程规划说明
+
+### 7.1 功能位置
 
 前台 `行程规划` 模块新增了 `AI 生成行程` 入口。
 
-### 6.2 当前能力边界
+### 7.2 当前能力边界
 
 当前版本支持：
 
@@ -189,7 +256,7 @@ npm run dev
 - AI 行程预览：`POST /api/trip-plans/ai-preview`
 - AI 行程保存：`POST /api/trip-plans/ai-save`
 
-### 6.3 第三方 AI 配置
+### 7.3 第三方 AI 配置
 
 后端通过环境变量读取第三方 AI 配置，不在仓库中保存真实密钥。
 
@@ -213,9 +280,9 @@ mvn spring-boot:run
 
 如果你只是本地调试，也可以基于 `start-dev.ps1` 复制一份本地专用脚本，填入你自己的环境变量后再运行本地版本。该脚本建议仅保留在本机，并加入 `.gitignore`。
 
-## 7. 已有功能概览
+## 8. 已有功能概览
 
-### 7.1 首页
+### 8.1 首页
 
 首页提供以下业务入口：
 
@@ -227,7 +294,7 @@ mvn spring-boot:run
 - 行程规划
 - 我的订单
 
-### 7.2 个人中心
+### 8.2 个人中心
 
 访问路径：
 
@@ -239,7 +306,7 @@ mvn spring-boot:run
 - 管理常用出行人
 - 查看和删除价格提醒
 
-### 7.3 订单中心
+### 8.3 订单中心
 
 访问路径：
 
@@ -253,7 +320,7 @@ mvn spring-boot:run
 - 取消订单
 - 对已完成订单发起评价
 
-### 7.4 行程规划
+### 8.4 行程规划
 
 访问路径：
 
@@ -266,7 +333,7 @@ mvn spring-boot:run
 - 维护每日行程安排
 - 通过 AI 规划入口生成并保存行程
 
-### 7.5 旅行分享
+### 8.5 旅行分享
 
 访问路径：
 
@@ -280,7 +347,7 @@ mvn spring-boot:run
 - 登录后发布分享
 - 上传分享图片
 
-### 7.6 酒店与旅游产品图片展示
+### 8.6 酒店与旅游产品图片展示
 
 当前支持：
 
@@ -289,7 +356,7 @@ mvn spring-boot:run
 - 前台详情页展示主图和图集
 - 老数据在没有详情图集时自动回退到封面图
 
-### 7.7 后台图片上传
+### 8.7 后台图片上传
 
 后台酒店管理和旅游产品管理支持直接从本地上传图片，不需要手动输入图片 URL。
 
@@ -300,7 +367,7 @@ mvn spring-boot:run
 - 上传数量到上限后自动隐藏上传入口
 - 上传成功后自动回填表单
 
-### 7.8 酒店到房型管理快捷入口
+### 8.8 酒店到房型管理快捷入口
 
 后台酒店管理页新增了 `管理房型` 按钮：
 
@@ -309,14 +376,14 @@ mvn spring-boot:run
 - 房型管理页会自动按该 `hotelId` 筛选
 - 新增房型时也会自动带入该 `hotelId`
 
-## 8. 后台功能概览
+## 9. 后台功能概览
 
-### 8.1 后台登录
+### 9.1 后台登录
 
 - 登录页：`/admin/login`
 - 控制台：`/admin/dashboard`
 
-### 8.2 商品管理
+### 9.2 商品管理
 
 后台商品管理覆盖：
 
@@ -328,7 +395,7 @@ mvn spring-boot:run
 
 支持常见 CRUD 操作。
 
-### 8.3 订单管理
+### 9.3 订单管理
 
 访问路径：
 
@@ -342,14 +409,14 @@ mvn spring-boot:run
 - 修改订单状态
 - 后台取消订单
 
-### 8.4 内容管理
+### 9.4 内容管理
 
 包括：
 
 - 分享管理：`/admin/content/shares`
 - 评价管理：`/admin/content/reviews`
 
-## 9. 接口与调试
+## 10. 接口与调试
 
 Swagger：
 
@@ -365,7 +432,7 @@ Swagger：
 
 - 商品图片上传：`POST /api/admin/media/upload`
 
-## 10. 演示建议
+## 11. 演示建议
 
 建议按以下顺序演示项目：
 
@@ -386,7 +453,7 @@ Swagger：
 3. 返回前台打开对应详情页查看展示效果
 4. 在酒店管理页点击 `管理房型`，继续维护该酒店的房型数据
 
-## 11. 注意事项
+## 12. 注意事项
 
 - 本项目用于本地和课程演示，不接入真实支付
 - 价格提醒和价格对比是站内演示能力，不依赖第三方实时业务接口
