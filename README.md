@@ -394,3 +394,46 @@ Swagger：
 - `travel-platform-server/uploads/` 已加入 `.gitignore`
 - 如需启用第三方 AI，务必通过环境变量或本地忽略脚本提供真实密钥，不要把密钥写回仓库
 - 如修改数据库连接信息，需要同步更新 `application.yml`
+
+## 12. 微服务版本快速验收
+
+### 12.1 版本与环境
+
+- 改造前版本：Git 标签 `monolith-start`
+- 微服务中期版本：Git 标签 `midterm-2026-08-29-microservices`
+- 当前交付分支：`codex/microservices-ci-integration`
+- CI 构建环境：JDK 17、Node.js 22、MySQL 8.4
+- 成员 E 本地实验环境：Windows 11、PowerShell 7.2+、Docker Desktop（Docker Engine 29.3.1）、kubectl 1.34.1、Kind 节点 Kubernetes 1.34.3
+
+版本和提交关系详见 [`docs/版本与提交记录.md`](docs/版本与提交记录.md)。
+
+### 12.2 Docker Compose 启动微服务
+
+在项目根目录执行：
+
+```powershell
+docker compose up --build -d
+docker compose ps
+```
+
+首次启动会创建 `travel_user`、`travel_product`、`travel_order` 和 `travel_content_trip` 数据库并导入演示数据。`docker compose down` 只停止并删除容器，命名卷中的 MySQL 数据和上传文件仍会保留。
+
+| 组件 | 本机端口 | 健康检查或入口 |
+| --- | ---: | --- |
+| 前端 | 8088 | `http://127.0.0.1:8088/` |
+| API 网关 | 8000 | `http://127.0.0.1:8000/api/public/health` |
+| 用户服务 | 8101 | `http://127.0.0.1:8101/api/public/health` |
+| 商品服务 | 8102 | `http://127.0.0.1:8102/api/public/health` |
+| 订单服务 | 8103 | `http://127.0.0.1:8103/api/public/health` |
+| 内容与行程服务 | 8104 | `http://127.0.0.1:8104/api/public/health` |
+| MySQL | 3307 | 容器内端口 3306 |
+
+测试账号仍使用第 5 节中的 `demo_user / 123456` 和 `admin / Admin123456`。以上仅为课程演示数据，不应作为生产凭据。
+
+### 12.3 Kubernetes 与云原生实验
+
+- Kubernetes 部署和回滚入口：[`deploy/k8s`](deploy/k8s)、[`scripts/deploy-kind.sh`](scripts/deploy-kind.sh)、[`scripts/rollback-kind.sh`](scripts/rollback-kind.sh)
+- 成员 E 独立实验配置：[`deploy/member-e`](deploy/member-e)
+- HPA、故障和性能复现入口：[`docs/成员E-第一二阶段完成报告-20260831.md`](docs/成员E-第一二阶段完成报告-20260831.md)
+- 原始证据及校验说明：[`experiments/results/成员E-原始证据说明.md`](experiments/results/成员E-原始证据说明.md)
+- 最终交付材料总索引：[`docs/最终提交材料索引.md`](docs/最终提交材料索引.md)
