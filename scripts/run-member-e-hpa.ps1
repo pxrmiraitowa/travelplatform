@@ -14,22 +14,13 @@ $expectedNamespace = 'travel-platform-bench-micro'
 if ($Namespace -ne $expectedNamespace) { throw 'Only the reviewed latest benchmark microservice namespace is allowed.' }
 $namespace = $Namespace
 $baseUrl = "http://127.0.0.1:$LocalPort"
-<<<<<<< HEAD
-$revision = (& git -C $root rev-parse HEAD)
-=======
 $protocolPath = Join-Path $root 'deploy/member-e-benchmark/protocol.json'
 $protocol = Get-Content -Raw -LiteralPath $protocolPath | ConvertFrom-Json
 $revision = [string]$protocol.sourceRevision
 $repositoryHead = (& git -C $root rev-parse HEAD)
 if ($LASTEXITCODE -ne 0 -or $revision -notmatch '^[a-f0-9]{40}$') { throw 'The reviewed application source revision is invalid.' }
-& git -C $root diff --quiet $revision $repositoryHead -- travel-platform-microservices travel-platform-server travel-platform-web
-if ($LASTEXITCODE -ne 0) { throw 'Application runtime inputs changed after the reviewed source revision; rebuild before this experiment.' }
-& git -C $root diff --quiet HEAD -- travel-platform-microservices travel-platform-server travel-platform-web
-if ($LASTEXITCODE -ne 0) { throw 'Application runtime inputs have uncommitted changes; refusing to mix them into HPA evidence.' }
-$untrackedRuntimeInputs = @(& git -C $root ls-files --others --exclude-standard -- travel-platform-microservices travel-platform-server travel-platform-web)
-if ($LASTEXITCODE -ne 0 -or $untrackedRuntimeInputs.Count -gt 0) { throw 'Application runtime inputs contain untracked files; refusing to mix them into HPA evidence.' }
->>>>>>> github/codex/microservices-ci-integration
 Import-Module (Join-Path $root 'experiments/scripts/LabEvidence.psm1') -Force
+$sourceCompatibility = Assert-LabSourceCompatibility -ProjectRoot $root -BaselineRevision $revision -RepositoryHead $repositoryHead
 if ((& kubectl config current-context) -ne $context) { throw 'The active kubectl context is not the reviewed local Kind cluster.' }
 $namespaceRevision = (& kubectl --context $context get namespace $namespace -o 'jsonpath={.metadata.annotations.lab\.travelplatform/source-revision}')
 if ($LASTEXITCODE -ne 0 -or $namespaceRevision -ne $revision) { throw 'The benchmark namespace does not match the checked-out source revision.' }
@@ -45,11 +36,8 @@ $directory = Join-Path $root "artifacts/member-e/$($revision.Substring(0,7))/hpa
 New-Item -ItemType Directory -Path $directory -Force | Out-Null
 $timeline = Join-Path $directory 'timeline.csv'
 $report = [ordered]@{
-<<<<<<< HEAD
-    StartedAt=(Get-Date).ToString('o'); SourceRevision=$revision; Context=$context; Namespace=$namespace; BaseUrl=$baseUrl
-=======
     StartedAt=(Get-Date).ToString('o'); SourceRevision=$revision; RepositoryHead=$repositoryHead; Context=$context; Namespace=$namespace; BaseUrl=$baseUrl
->>>>>>> github/codex/microservices-ci-integration
+    SourceCompatibility=$sourceCompatibility
     HpaUid=$hpa.metadata.uid; DeploymentUid=$deployment.metadata.uid; Purpose='formal-hpa-verification'; Status='Running'
     VirtualUsers=$VirtualUsers; LoadSeconds=$LoadSeconds; SleepSeconds=$SleepSeconds
     TargetPath='/api/public/flights'; BaselineStableSeconds=30; CooldownTimeoutSeconds=360

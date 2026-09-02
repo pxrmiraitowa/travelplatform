@@ -10,6 +10,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'LabHttp.psm1') -Force
+Import-Module (Join-Path $PSScriptRoot 'LabEvidence.psm1') -Force
 
 $expectedContext = 'kind-travel-platform'
 $expectedNamespace = 'travel-platform-bench-micro'
@@ -26,10 +27,7 @@ if ($Context -ne $expectedContext -or $Namespace -ne $expectedNamespace) {
 if ((& kubectl config current-context) -ne $Context) {
     throw 'The active kubectl context is not the reviewed local Kind cluster.'
 }
-& git -C $projectRoot diff --quiet $expectedSourceRevision HEAD -- travel-platform-microservices travel-platform-server travel-platform-web
-if ($LASTEXITCODE -ne 0) { throw 'Application runtime inputs changed after the tested source revision; rebuild before this experiment.' }
-& git -C $projectRoot diff --quiet -- travel-platform-microservices
-if ($LASTEXITCODE -ne 0) { throw 'The microservice source has uncommitted changes; refusing to mix them into fault evidence.' }
+$sourceCompatibility = Assert-LabSourceCompatibility -ProjectRoot $projectRoot -BaselineRevision $expectedSourceRevision
 
 function Invoke-Kube {
     param([Parameter(Mandatory)][string[]]$Arguments)
@@ -111,7 +109,7 @@ New-Item -ItemType Directory -Path $sessionDirectory -Force | Out-Null
 $resultFile = Join-Path $sessionDirectory 'fault-experiment.json'
 $result = [ordered]@{
     SchemaVersion=1; SessionId=$sessionId; Status='Running'; StartedAt=(Get-Date).ToString('o'); FinishedAt=$null; Error=$null
-    Context=$Context; Namespace=$Namespace; NamespaceUid=$namespaceObject.metadata.uid; SourceRevision=$expectedSourceRevision
+    Context=$Context; Namespace=$Namespace; NamespaceUid=$namespaceObject.metadata.uid; SourceRevision=$expectedSourceRevision; SourceCompatibility=$sourceCompatibility
     Fault=[ordered]@{Type='dependency-unavailable'; Target='Deployment/product-service'; OriginalReplicas=1; Injected=$false; Restored=$false}
     Expected=[ordered]@{BusinessCode=500; Message=$expectedMessage; MaximumResponseMs=8000; OtherServicesRemainHealthy=$true}
     Before=[ordered]@{}; During=[ordered]@{}; After=[ordered]@{}; Checks=[Collections.Generic.List[object]]::new()

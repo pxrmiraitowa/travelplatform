@@ -1,5 +1,23 @@
 # 旅游平台项目说明
 
+## 0. 最终验收入口
+
+课程最终微服务版本位于 `codex/microservices-ci-integration` 分支。为避免克隆仓库默认分支后误用旧版本，验收时请明确指定分支：
+
+```powershell
+git clone --branch codex/microservices-ci-integration --single-branch https://github.com/pxrmiraitowa/travelplatform.git
+cd travelplatform
+git rev-parse HEAD
+```
+
+成员 E 的最终交付可先运行只读核验脚本，检查冲突标记、JSON、实验 ZIP、PowerShell 语法、版本差异和 `.env` 跟踪状态：
+
+```powershell
+pwsh -NoProfile -File scripts/verify-member-e-delivery.ps1
+```
+
+全组材料入口见 [`docs/最终提交材料索引.md`](docs/最终提交材料索引.md)。
+
 ## 1. 项目简介
 
 这是一个课程演示用的综合旅游平台，采用前后端分离架构，覆盖用户端和后台管理端的完整业务流程。当前项目重点是业务链路完整、演示稳定、模块清晰，不接入真实支付，也不依赖第三方实时业务接口。
@@ -162,9 +180,12 @@ npm run dev
 微服务版会启动 MySQL、数据库初始化任务、4 个业务服务、网关和 Nginx 前端。在项目根目录运行：
 
 ```powershell
+Copy-Item .env.example .env
 docker compose up --build -d
 docker compose ps
 ```
+
+Linux 或 macOS 使用 `cp .env.example .env`。`.env` 仅保存本机演示配置并已被 Git 忽略；仓库只提交不含真实凭据的 `.env.example`。
 
 首次启动会下载镜像和 Maven/npm 依赖，需要等待各业务服务的状态变为 `healthy`，`db-init` 的状态变为 `Exited (0)`。默认端口可在根目录 `.env` 中修改：
 
@@ -462,9 +483,9 @@ Swagger：
 - 如需启用第三方 AI，务必通过环境变量或本地忽略脚本提供真实密钥，不要把密钥写回仓库
 - 如修改数据库连接信息，需要同步更新 `application.yml`
 
-## 12. 微服务版本快速验收
+## 13. 微服务版本快速验收
 
-### 12.1 版本与环境
+### 13.1 版本与环境
 
 - 改造前版本：Git 标签 `monolith-start`
 - 微服务中期版本：Git 标签 `midterm-2026-08-29-microservices`
@@ -474,7 +495,7 @@ Swagger：
 
 版本和提交关系详见 [`docs/版本与提交记录.md`](docs/版本与提交记录.md)。
 
-### 12.2 Docker Compose 启动微服务
+### 13.2 Docker Compose 启动微服务
 
 在项目根目录执行：
 
@@ -495,12 +516,13 @@ docker compose ps
 | 内容与行程服务 | 8104 | `http://127.0.0.1:8104/api/public/health` |
 | MySQL | 3307 | 容器内端口 3306 |
 
-测试账号仍使用第 5 节中的 `demo_user / 123456` 和 `admin / Admin123456`。以上仅为课程演示数据，不应作为生产凭据。
+测试账号使用第 5 节中的微服务账号：`demo_user / 123456` 和 `admin / 123456`。以上仅为课程演示数据，不应作为生产凭据。
 
-### 12.3 Kubernetes 与云原生实验
+### 13.3 Kubernetes 与云原生实验
 
 - Kubernetes 部署和回滚入口：[`deploy/k8s`](deploy/k8s)、[`scripts/deploy-kind.sh`](scripts/deploy-kind.sh)、[`scripts/rollback-kind.sh`](scripts/rollback-kind.sh)
 - 成员 E 独立实验配置：[`deploy/member-e`](deploy/member-e)
 - HPA、故障和性能复现入口：[`docs/成员E-第一二阶段完成报告-20260831.md`](docs/成员E-第一二阶段完成报告-20260831.md)
 - 原始证据及校验说明：[`experiments/results/成员E-原始证据说明.md`](experiments/results/成员E-原始证据说明.md)
 - 最终交付材料总索引：[`docs/最终提交材料索引.md`](docs/最终提交材料索引.md)
+- 成员 E 一键交付核验：`pwsh -NoProfile -File scripts/verify-member-e-delivery.ps1`

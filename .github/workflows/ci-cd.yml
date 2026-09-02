@@ -48,6 +48,13 @@ jobs:
     steps:
       - name: Check out source code
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Verify member E delivery integrity
+        if: github.ref == 'refs/heads/codex/microservices-ci-integration'
+        shell: pwsh
+        run: pwsh -NoProfile -File scripts/verify-member-e-delivery.ps1
 
       - name: Prepare evidence directory
         run: mkdir -p artifacts

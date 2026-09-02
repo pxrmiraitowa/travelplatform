@@ -6,17 +6,11 @@
   "branch": "codex/microservices-ci-integration",
   "evidenceRoot": "artifacts/member-e/aece119",
   "deliveryArchive": {
-<<<<<<< HEAD
-    "file": "成员E-最新版原始证据-aece119-20260831.zip",
-    "bytes": 34677553,
-    "sha256": "279A7B1C9FA94820D9BD86A93D3C2CE788D1ED4737006ACE868CC36566EF4D41"
-=======
     "file": "experiments/results/成员E-最新版原始证据-aece119-20260831.zip",
     "bytes": 34677553,
     "sha256": "279A7B1C9FA94820D9BD86A93D3C2CE788D1ED4737006ACE868CC36566EF4D41",
     "entryCount": 79,
     "trackedInRepository": true
->>>>>>> github/codex/microservices-ci-integration
   },
   "evidence": {
     "monolithBuild": "monolith-build-20260831-144936-9c1e86fc",

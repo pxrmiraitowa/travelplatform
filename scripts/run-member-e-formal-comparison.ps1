@@ -29,10 +29,7 @@ if (@($protocol.order).Count -ne 6 -or @($protocol.order | Where-Object {$_ -eq 
 if ($protocol.hpaEnabled -or $protocol.replicasPerDeployment -ne 1) { throw 'Formal architecture comparison must use fixed single replicas.' }
 if ($protocol.virtualUsers -ne 30 -or $protocol.warmupSecondsPerRun -ne 30 -or $protocol.measurementSecondsPerRun -ne 60) { throw 'Unexpected workload parameters; create a new reviewed protocol instead of silently changing them.' }
 
-& git -C $projectRoot diff --quiet $protocol.sourceRevision HEAD -- travel-platform-microservices travel-platform-server travel-platform-web deploy .github
-if ($LASTEXITCODE -ne 0) { throw 'Runtime inputs changed after the tested source revision; rebuild the pair before measuring.' }
-& git -C $projectRoot diff --quiet -- travel-platform-microservices travel-platform-web
-if ($LASTEXITCODE -ne 0) { throw 'Uncommitted application changes would make the runtime baseline ambiguous.' }
+$sourceCompatibility = Assert-LabSourceCompatibility -ProjectRoot $projectRoot -BaselineRevision $protocol.sourceRevision
 & docker image inspect $DockerK6Image *> $null
 if ($LASTEXITCODE -ne 0) { throw "The pinned local k6 image is missing: $DockerK6Image" }
 
@@ -46,7 +43,7 @@ New-Item -ItemType Directory -Path $sessionDirectory -Force | Out-Null
 $metadataFile=Join-Path $sessionDirectory 'metadata.json'
 $metadata=[ordered]@{
     SchemaVersion=1;SessionId=$sessionId;Status='Running';StartedAt=(Get-Date).ToString('o');FinishedAt=$null;Error=$null
-    SourceRevision=$protocol.sourceRevision;RepositoryHead=(& git -C $projectRoot rev-parse HEAD);PreparedDirectory=$preparedRoot
+    SourceRevision=$protocol.sourceRevision;RepositoryHead=(& git -C $projectRoot rev-parse HEAD);SourceCompatibility=$sourceCompatibility;PreparedDirectory=$preparedRoot
     Protocol=$protocol;ProtocolSha256=(Get-FileHash $protocolPath -Algorithm SHA256).Hash
     K6=[ordered]@{Image=$DockerK6Image;ImageId=(& docker image inspect $DockerK6Image --format '{{.Id}}');ScriptSha256=(Get-FileHash $k6Script -Algorithm SHA256).Hash}
     Preflight=$null;Before=$null;After=$null;Runs=[Collections.Generic.List[object]]::new();SecretValuesIncluded=$false

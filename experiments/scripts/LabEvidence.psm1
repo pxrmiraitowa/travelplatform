@@ -77,4 +77,52 @@ function Assert-LabFixedScale {
         }
     }
 }
-Export-ModuleMember -Function Invoke-LabKube,Get-LabSnapshot,Convert-LabCpuMilli,Convert-LabMemoryMi,Get-LabSeconds,Get-LabConfigFingerprint,Assert-LabFixedScale
+function Assert-LabSourceCompatibility {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)][string]$ProjectRoot,
+        [Parameter(Mandatory)][string]$BaselineRevision,
+        [string]$RepositoryHead = 'HEAD'
+    )
+    $reviewedBaseline = 'aece11988e2364289625c0de2c75b18444c55b8d'
+    $approvedPath = 'travel-platform-web/vite.config.js'
+    $approvedNormalizedSha256 = '10522FA4CFDF9FE712792AC1017408B8F065ABA9FE1B3B76D88D0E0886734C23'
+    if ($BaselineRevision -ne $reviewedBaseline) {
+        throw 'The requested baseline is not the reviewed member E experiment revision.'
+    }
+    $runtimePaths = @('travel-platform-microservices','travel-platform-server','travel-platform-web')
+    $changes = @(& git -C $ProjectRoot diff --name-only $BaselineRevision $RepositoryHead -- @runtimePaths)
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot compare the reviewed application source with the repository head.' }
+    $unexpected = @($changes | Where-Object { $_ -ne $approvedPath })
+    if ($unexpected.Count -gt 0) {
+        throw "Application runtime inputs changed after the reviewed source revision: $($unexpected -join ', ')"
+    }
+    $approvedDelta = @()
+    if ($approvedPath -in $changes) {
+        $content = (Get-Content -Raw -LiteralPath (Join-Path $ProjectRoot $approvedPath)) -replace "`r`n","`n"
+        $bytes = [Text.Encoding]::UTF8.GetBytes($content)
+        $actualHash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($bytes))
+        if ($actualHash -ne $approvedNormalizedSha256) {
+            throw 'The post-experiment Vite configuration is not the reviewed development-proxy-only change.'
+        }
+        $approvedDelta = @([ordered]@{
+            Path=$approvedPath
+            Scope='Vite development-server proxy default only; Docker/Kubernetes production traffic uses Nginx and is unchanged.'
+            NormalizedSha256=$actualHash
+        })
+    }
+    $workingChanges = @(& git -C $ProjectRoot diff --name-only HEAD -- @runtimePaths)
+    if ($LASTEXITCODE -ne 0 -or $workingChanges.Count -gt 0) {
+        throw 'Application runtime inputs have uncommitted changes; refusing an ambiguous experiment baseline.'
+    }
+    $untracked = @(& git -C $ProjectRoot ls-files --others --exclude-standard -- @runtimePaths)
+    if ($LASTEXITCODE -ne 0 -or $untracked.Count -gt 0) {
+        throw 'Application runtime inputs contain untracked files; refusing an ambiguous experiment baseline.'
+    }
+    return [pscustomobject]@{
+        BaselineRevision=$BaselineRevision
+        RepositoryHead=(& git -C $ProjectRoot rev-parse $RepositoryHead)
+        ApprovedNonRuntimeDelta=$approvedDelta
+    }
+}
+Export-ModuleMember -Function Invoke-LabKube,Get-LabSnapshot,Convert-LabCpuMilli,Convert-LabMemoryMi,Get-LabSeconds,Get-LabConfigFingerprint,Assert-LabFixedScale,Assert-LabSourceCompatibility
