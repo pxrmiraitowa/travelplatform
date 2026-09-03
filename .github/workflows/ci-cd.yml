@@ -1,3 +1,4 @@
+# 向指定分支推送提交后，自动执行构建、测试、镜像制作和部署。
 name: Travel Platform Microservices - CI then CD
 
 on:
